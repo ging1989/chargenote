@@ -6,32 +6,13 @@ const RATES_KEY = "ev_station_rates";   // local cache ของ rates
 const TABLE     = "charging_sessions";
 const RTABLE    = "station_rates";
 const SUPABASE_DEFAULT = {
-  url:"",
-  key:"",
-};
-
-// ── Default station rates ───────────────────────────────────────
-// type: "peak" → มี on_peak + off_peak
-// type: "flat" → ราคาเดียว
-const DEFAULT_RATES = {
-  "PTT":            { type:"peak", on_peak:8.29, off_peak:5.49, on_time:"09:00–22:00", off_time:"22:00–09:00", color:"#E8A33A", abbr:"PT" },
-  "PEA VOLTA":      { type:"peak", on_peak:7.98, off_peak:5.48, on_time:"09:00–22:00", off_time:"22:00–09:00", color:"#7BBE74", abbr:"PV" },
-  "iGreen+":        { type:"peak", on_peak:8.50, off_peak:5.90, on_time:"09:00–22:00", off_time:"22:00–09:00", color:"#3E8B6A", abbr:"IG" },
-  "EleX":           { type:"flat", flat:7.50, color:"#4F9F52", abbr:"EX" },
-  "EleX by EGAT":   { type:"flat", flat:7.50, color:"#4F9F52", abbr:"EX" },
-  "Elexa":          { type:"flat", flat:7.50, color:"#4F9F52", abbr:"EX" },
-  "EA Anywhere":    { type:"flat", flat:7.50, color:"#A8D5A0", abbr:"EA" },
-  "MEA EV":         { type:"flat", flat:6.50, color:"#5BA88E", abbr:"ME" },
-  "EV Station Pluz":{ type:"flat", flat:7.80, color:"#3E8B6A", abbr:"PZ" },
-  "PTT EV Station PluZ":{ type:"flat", flat:7.80, color:"#3E8B6A", abbr:"PZ" },
-  "Sharge":         { type:"flat", flat:8.00, color:"#6CAE76", abbr:"SH" },
-  "ReverSharger":   { type:"flat", flat:7.20, color:"#7A5AE0", abbr:"RS" },
+  url:"https://znwhsbjjykkbbgqyoewl.supabase.co",
+  key:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud2hzYmpqeWtrYmJncXlvZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MDQ0MTQsImV4cCI6MjA5NTE4MDQxNH0.juLswcub25iERIJllOdO_Uf-iicbSnVuuf0FM6xoJ2M",
 };
 
 // ── Storage helpers ─────────────────────────────────────────────
 const loadCfg   = () => { try{ return JSON.parse(localStorage.getItem(CFG_KEY))||SUPABASE_DEFAULT; }catch(e){ return SUPABASE_DEFAULT; } };
-const saveCfg   = c  => localStorage.setItem(CFG_KEY, JSON.stringify(c));
-const loadRates = () => { try{ const r=JSON.parse(localStorage.getItem(RATES_KEY)); return r||DEFAULT_RATES; }catch(e){ return DEFAULT_RATES; } };
+const loadRates = () => { try{ return JSON.parse(localStorage.getItem(RATES_KEY))||{}; }catch(e){ return {}; } };
 const saveRates = r  => localStorage.setItem(RATES_KEY, JSON.stringify(r));
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -43,48 +24,17 @@ const dLbl = d => { const dt=new Date(d+"T00:00:00"),mo=["ม.ค.","ก.พ.","
 const smeta = (name,rates) => rates[name] || { type:"flat", flat:0, color:"#8AA08C", abbr:(name||"??").slice(0,2).toUpperCase() };
 const makeAbbr = name => (name||"EV").split(/\s+/).filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase() || "EV";
 const rateFromDb = r => ({
+  id:r.id,
   type:r.rate_type||"flat",
   on_peak:r.on_peak,
   off_peak:r.off_peak,
   on_time:r.on_time||"09:00–22:00",
   off_time:r.off_time||"22:00–09:00",
   flat:r.flat,
-  color:r.color||DEFAULT_RATES[r.station]?.color||"#6CAE76",
-  abbr:r.abbr||DEFAULT_RATES[r.station]?.abbr||makeAbbr(r.station),
+  color:r.color||"#6CAE76",
+  abbr:r.abbr||makeAbbr(r.station),
 });
 
-const DEMO_ENTRIES = [
-  { id:-1, date:"2026-05-22", station:"EleX by EGAT", trip:"Central Westgate · DC fast", peak_type:null, price_before_disc:288.15, kwh:38.42, discount:0, final_price:288.15, baht_per_kwh:7.5 },
-  { id:-2, date:"2026-05-19", station:"Sharge", trip:"EmSphere", peak_type:null, price_before_disc:238.40, kwh:29.80, discount:0, final_price:238.40, baht_per_kwh:8 },
-  { id:-3, date:"2026-05-16", station:"PEA VOLTA", trip:"ปั๊ม ปตท. รังสิต · Member", peak_type:"off_peak", price_before_disc:301.32, kwh:41.85, discount:15, final_price:286.32, baht_per_kwh:6.8416 },
-  { id:-4, date:"2026-05-12", station:"PTT EV Station PluZ", trip:"ปตท. บางนา-ตราด km.12", peak_type:null, price_before_disc:277.68, kwh:35.60, discount:0, final_price:277.68, baht_per_kwh:7.8 },
-  { id:-5, date:"2026-05-08", station:"MEA EV", trip:"The Nine Center", peak_type:null, price_before_disc:201.50, kwh:31.00, discount:0, final_price:201.50, baht_per_kwh:6.5 },
-  { id:-6, date:"2026-05-03", station:"EA Anywhere", trip:"Mega Bangna", peak_type:null, price_before_disc:210.00, kwh:28.00, discount:0, final_price:210.00, baht_per_kwh:7.5 },
-  { id:-7, date:"2026-04-28", station:"EleX by EGAT", trip:"Lotus North Ratchapruek", peak_type:null, price_before_disc:331.73, kwh:44.23, discount:0, final_price:331.73, baht_per_kwh:7.5 },
-  { id:-8, date:"2026-04-20", station:"PEA VOLTA", trip:"อยุธยา", peak_type:"on_peak", price_before_disc:422.94, kwh:53.00, discount:0, final_price:422.94, baht_per_kwh:7.98 },
-  { id:-9, date:"2026-04-11", station:"EleX", trip:"Central Rama 2", peak_type:null, price_before_disc:389.63, kwh:51.95, discount:0, final_price:389.63, baht_per_kwh:7.5 },
-  { id:-10, date:"2026-04-04", station:"PTT EV Station PluZ", trip:"หัวหิน", peak_type:null, price_before_disc:374.40, kwh:48.00, discount:0, final_price:374.40, baht_per_kwh:7.8 },
-  { id:-11, date:"2026-03-25", station:"EleX by EGAT", trip:"Central Westgate", peak_type:null, price_before_disc:365.03, kwh:48.67, discount:0, final_price:365.03, baht_per_kwh:7.5 },
-  { id:-12, date:"2026-03-16", station:"EA Anywhere", trip:"Seacon Square", peak_type:null, price_before_disc:326.25, kwh:43.50, discount:0, final_price:326.25, baht_per_kwh:7.5 },
-  { id:-13, date:"2026-03-05", station:"MEA EV", trip:"Siam Premium", peak_type:null, price_before_disc:367.25, kwh:56.50, discount:0, final_price:367.25, baht_per_kwh:6.5 },
-  { id:-14, date:"2026-02-22", station:"Sharge", trip:"EmQuartier", peak_type:null, price_before_disc:260.00, kwh:32.50, discount:0, final_price:260.00, baht_per_kwh:8 },
-  { id:-15, date:"2026-02-12", station:"PEA VOLTA", trip:"ชลบุรี", peak_type:"off_peak", price_before_disc:306.88, kwh:56.00, discount:0, final_price:306.88, baht_per_kwh:5.48 },
-  { id:-16, date:"2026-02-03", station:"PTT EV Station PluZ", trip:"ศรีนครินทร์", peak_type:null, price_before_disc:265.20, kwh:34.00, discount:0, final_price:265.20, baht_per_kwh:7.8 },
-  { id:-17, date:"2026-01-24", station:"EleX by EGAT", trip:"Central World", peak_type:null, price_before_disc:332.25, kwh:44.30, discount:0, final_price:332.25, baht_per_kwh:7.5 },
-  { id:-18, date:"2026-01-14", station:"EA Anywhere", trip:"Motorway", peak_type:null, price_before_disc:287.63, kwh:38.35, discount:0, final_price:287.63, baht_per_kwh:7.5 },
-  { id:-19, date:"2026-01-05", station:"PEA VOLTA", trip:"ระยอง", peak_type:"on_peak", price_before_disc:336.76, kwh:42.20, discount:0, final_price:336.76, baht_per_kwh:7.98 },
-  { id:-20, date:"2025-12-27", station:"EleX by EGAT", trip:"CDC", peak_type:null, price_before_disc:314.25, kwh:41.90, discount:0, final_price:314.25, baht_per_kwh:7.5 },
-  { id:-21, date:"2025-12-16", station:"Sharge", trip:"Emsphere", peak_type:null, price_before_disc:296.00, kwh:37.00, discount:0, final_price:296.00, baht_per_kwh:8 },
-  { id:-22, date:"2025-12-04", station:"MEA EV", trip:"ICONSIAM", peak_type:null, price_before_disc:195.00, kwh:30.00, discount:0, final_price:195.00, baht_per_kwh:6.5 },
-  { id:-23, date:"2025-11-26", station:"PEA VOLTA", trip:"บางปะอิน", peak_type:"off_peak", price_before_disc:246.60, kwh:45.00, discount:20, final_price:226.60, baht_per_kwh:5.0356 },
-  { id:-24, date:"2025-11-12", station:"EleX by EGAT", trip:"Central Pinklao", peak_type:null, price_before_disc:315.75, kwh:42.10, discount:0, final_price:315.75, baht_per_kwh:7.5 },
-  { id:-25, date:"2025-11-02", station:"PTT EV Station PluZ", trip:"บางใหญ่", peak_type:null, price_before_disc:195.00, kwh:25.00, discount:0, final_price:195.00, baht_per_kwh:7.8 },
-  { id:-26, date:"2025-10-23", station:"Sharge", trip:"Samyan Mitrtown", peak_type:null, price_before_disc:224.00, kwh:28.00, discount:0, final_price:224.00, baht_per_kwh:8 },
-  { id:-27, date:"2025-10-15", station:"EA Anywhere", trip:"Fashion Island", peak_type:null, price_before_disc:244.50, kwh:32.60, discount:0, final_price:244.50, baht_per_kwh:7.5 },
-  { id:-28, date:"2025-10-04", station:"PEA VOLTA", trip:"นครปฐม", peak_type:"on_peak", price_before_disc:239.40, kwh:30.00, discount:0, final_price:239.40, baht_per_kwh:7.98 },
-  { id:-29, date:"2025-09-16", station:"EleX by EGAT", trip:"Central Village", peak_type:null, price_before_disc:272.25, kwh:36.30, discount:15, final_price:257.25, baht_per_kwh:7.0868 },
-  { id:-30, date:"2025-09-05", station:"MEA EV", trip:"Bitec Bangna", peak_type:null, price_before_disc:182.00, kwh:28.00, discount:0, final_price:182.00, baht_per_kwh:6.5 },
-];
 
 // ── Supabase API ────────────────────────────────────────────────
 function makeApi(url, key) {
@@ -211,6 +161,89 @@ alter table station_rates add column if not exists abbr text;
 alter table station_rates enable row level security;
 create policy "allow all" on station_rates
   for all using (true) with check (true);`;
+
+// ── Auth ─────────────────────────────────────────────────────────
+const AUTH_KEY    = "ev_auth_hash";
+const SESSION_KEY = "ev_authed";
+
+async function hashPin(pin) {
+  const data = new TextEncoder().encode("chargenote:" + pin);
+  const buf  = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+const isSessionActive = () => sessionStorage.getItem(SESSION_KEY) === "1";
+const setSession      = () => sessionStorage.setItem(SESSION_KEY, "1");
+const clearSession    = () => sessionStorage.removeItem(SESSION_KEY);
+const getStoredHash   = () => localStorage.getItem(AUTH_KEY);
+const setStoredHash   = h  => localStorage.setItem(AUTH_KEY, h);
+
+function LoginScreen({ onAuth }) {
+  const hasPin = !!getStoredHash();
+  const [pin, setPin]         = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr]         = useState("");
+  const [busy, setBusy]       = useState(false);
+  const pinRef = useRef(null);
+
+  useEffect(() => { pinRef.current?.focus(); }, []);
+
+  const submit = async () => {
+    if (!pin) { setErr("กรุณากรอก PIN"); return; }
+    setBusy(true); setErr("");
+    try {
+      if (!hasPin) {
+        if (pin.length < 4)           { setErr("PIN ต้องมีอย่างน้อย 4 ตัว"); return; }
+        if (pin !== confirm)           { setErr("PIN ไม่ตรงกัน กรุณากรอกใหม่"); return; }
+        setStoredHash(await hashPin(pin));
+        setSession(); onAuth();
+      } else {
+        const h = await hashPin(pin);
+        if (h === getStoredHash()) { setSession(); onAuth(); }
+        else { setErr("PIN ไม่ถูกต้อง"); setPin(""); }
+      }
+    } finally { setBusy(false); }
+  };
+
+  const onKey = e => { if (e.key === "Enter") submit(); };
+
+  return (
+    <div className="auth-scrim">
+      <div className="auth-card">
+        <div className="logo auth-logo">{I.bolt}</div>
+        <h2>{hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN ครั้งแรก"}</h2>
+        <p>{hasPin ? "กรอก PIN เพื่อเปิดแอป" : "ตั้ง PIN สำหรับป้องกันข้อมูล (ตัวเลขหรือตัวอักษร)"}</p>
+        <div className="auth-fields">
+          <input
+            ref={pinRef}
+            type="password"
+            className="auth-input"
+            placeholder={hasPin ? "PIN" : "PIN ใหม่ (อย่างน้อย 4 ตัว)"}
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            onKeyDown={onKey}
+            autoComplete="current-password"
+          />
+          {!hasPin && (
+            <input
+              type="password"
+              className="auth-input"
+              placeholder="ยืนยัน PIN"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              onKeyDown={onKey}
+              autoComplete="new-password"
+            />
+          )}
+        </div>
+        {err && <div className="auth-err">⚠ {err}</div>}
+        <button className="btn btn-primary auth-btn" onClick={submit} disabled={busy}>
+          {busy ? "กำลังตรวจสอบ…" : hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN และเข้าสู่ระบบ"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Setup ───────────────────────────────────────────────────────
 function SetupPanel({ onSave }) {
@@ -505,14 +538,14 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
   const finalPrice=Math.max(0,(+form.price_before_disc||0)-(+form.discount||0));
   const bahtPerKwh=+form.kwh>0?finalPrice/(+form.kwh):0;
   const discountErr=+form.discount>0&&+form.discount>(+form.price_before_disc||0);
-  const valid=form.date&&form.station&&+form.price_before_disc>0&&+form.kwh>0&&(!isPeak||form.peak_type)&&!discountErr;
+  const valid=form.date&&form.station&&+form.price_before_disc>=0&&+form.kwh>=0&&(!isPeak||form.peak_type)&&!discountErr;
 
   const handleSave=()=>{
     if(!valid)return;
     // build snapshot
     const snap=stationRate?{...stationRate,captured_at:new Date().toISOString()}:null;
     onSave({
-      date:form.date, station:form.station, trip:form.trip||null,
+      date:form.date, station:form.station, station_id:stationRate?.id||null, trip:form.trip||null,
       peak_type:form.peak_type||null,
       price_before_disc:+form.price_before_disc,
       kwh:+form.kwh, discount:+form.discount||0,
@@ -627,9 +660,29 @@ function AdminPanel({rates,setRates,api}){
   const [saved,setSaved]=useState(false);
   const [saveErr,setSaveErr]=useState("");
   const [draft,setDraft]=useState({station:"",type:"flat",flat:"7.50",on_peak:"8.00",off_peak:"5.50",on_time:"09:00–22:00",off_time:"22:00–09:00",color:"#6CAE76",abbr:""});
+  const [editKey,setEditKey]=useState(null);
+  const [editDraft,setEditDraft]=useState({name:"",abbr:"",color:""});
   const isDirty=JSON.stringify(local)!==JSON.stringify(rates);
 
   useEffect(()=>{ setLocal(JSON.parse(JSON.stringify(rates))); },[rates]);
+
+  const startEdit=(station)=>{
+    const d=local[station];
+    setEditKey(station);
+    setEditDraft({name:station,abbr:d.abbr||"",color:d.color||"#6CAE76"});
+  };
+  const applyEdit=()=>{
+    const newName=editDraft.name.trim();
+    if(!newName) return;
+    setLocal(r=>{
+      const next={...r};
+      const data={...next[editKey],abbr:editDraft.abbr.toUpperCase().slice(0,3),color:editDraft.color};
+      if(newName!==editKey){ delete next[editKey]; next[newName]=data; }
+      else { next[editKey]=data; }
+      return next;
+    });
+    setEditKey(null);
+  };
 
   const setField=(station,field,val)=>{
     setLocal(r=>({...r,[station]:{...r[station],[field]:field==="on_peak"||field==="off_peak"||field==="flat"?+val||0:val}}));
@@ -727,17 +780,17 @@ function AdminPanel({rates,setRates,api}){
         {draft.type==="flat"?(
           <div className="field compact">
             <label>ราคา</label>
-            <input type="number" step="0.01" value={draft.flat} onChange={e=>setDraft(d=>({...d,flat:e.target.value}))}/>
+            <input type="number" step="0.01" min="0" value={draft.flat} onChange={e=>setDraft(d=>({...d,flat:e.target.value}))}/>
           </div>
         ):(
           <>
             <div className="field compact">
               <label>On</label>
-              <input type="number" step="0.01" value={draft.on_peak} onChange={e=>setDraft(d=>({...d,on_peak:e.target.value}))}/>
+              <input type="number" step="0.01" min="0" value={draft.on_peak} onChange={e=>setDraft(d=>({...d,on_peak:e.target.value}))}/>
             </div>
             <div className="field compact">
               <label>Off</label>
-              <input type="number" step="0.01" value={draft.off_peak} onChange={e=>setDraft(d=>({...d,off_peak:e.target.value}))}/>
+              <input type="number" step="0.01" min="0" value={draft.off_peak} onChange={e=>setDraft(d=>({...d,off_peak:e.target.value}))}/>
             </div>
           </>
         )}
@@ -749,27 +802,37 @@ function AdminPanel({rates,setRates,api}){
           return(
             <div className="rate-row" key={station}>
               <div className="rr-name">
-                <div className="rr-sname">
-                  <span style={{width:26,height:26,borderRadius:7,background:data.color||s.color,display:"inline-grid",placeItems:"center",fontSize:10,fontWeight:700,color:"#fff",flexShrink:0}}>{data.abbr||s.abbr}</span>
-                  {station}
-                  <span style={{fontSize:11,background:data.type==="peak"?"#FFF3CD":"var(--mint)",color:data.type==="peak"?"#9A6400":"var(--leaf-deep)",padding:"2px 8px",borderRadius:999,fontWeight:500}}>
-                    {data.type==="peak"?"On/Off Peak":"Flat Rate"}
-                  </span>
-                </div>
+                {editKey===station?(
+                  <div className="rr-edit">
+                    <input className="rr-edit-input" value={editDraft.name} onChange={e=>setEditDraft(d=>({...d,name:e.target.value}))} placeholder="ชื่อสถานี"/>
+                    <input className="rr-edit-input" value={editDraft.abbr} onChange={e=>setEditDraft(d=>({...d,abbr:e.target.value.toUpperCase()}))} placeholder="ตัวย่อ" maxLength="3" style={{width:60}}/>
+                    <input type="color" value={editDraft.color} onChange={e=>setEditDraft(d=>({...d,color:e.target.value}))} style={{width:36,height:34,padding:2,borderRadius:8,border:"1px solid var(--line)",cursor:"pointer"}}/>
+                    <button className="btn btn-primary" style={{padding:"6px 12px",fontSize:12}} onClick={applyEdit}>บันทึก</button>
+                    <button className="btn btn-ghost" style={{padding:"6px 12px",fontSize:12}} onClick={()=>setEditKey(null)}>ยกเลิก</button>
+                  </div>
+                ):(
+                  <div className="rr-sname">
+                    <span style={{width:26,height:26,borderRadius:7,background:data.color||s.color,display:"inline-grid",placeItems:"center",fontSize:10,fontWeight:700,color:"#fff",flexShrink:0}}>{data.abbr||s.abbr}</span>
+                    {station}
+                    <span style={{fontSize:11,background:data.type==="peak"?"#FFF3CD":"var(--mint)",color:data.type==="peak"?"#9A6400":"var(--leaf-deep)",padding:"2px 8px",borderRadius:999,fontWeight:500}}>
+                      {data.type==="peak"?"On/Off Peak":"Flat Rate"}
+                    </span>
+                  </div>
+                )}
               </div>
               {data.type==="peak"?(
                 <div className="rate-inputs">
                   <div className="rate-input-group">
-                    <label>🌞 On Peak (฿/kWh)</label>
-                    <input type="number" step="0.01" value={data.on_peak||""} onChange={e=>setField(station,"on_peak",e.target.value)}/>
+                    <label>On Peak (฿/kWh)</label>
+                    <input type="number" step="0.01" min="0" value={data.on_peak||""} onChange={e=>setField(station,"on_peak",e.target.value)}/>
                   </div>
                   <div className="rate-input-group">
                     <label>On Peak เวลา</label>
                     <input type="text" value={data.on_time||""} onChange={e=>setField(station,"on_time",e.target.value)} placeholder="09:00–22:00" style={{fontFamily:"inherit"}}/>
                   </div>
                   <div className="rate-input-group">
-                    <label>🌙 Off Peak (฿/kWh)</label>
-                    <input type="number" step="0.01" value={data.off_peak||""} onChange={e=>setField(station,"off_peak",e.target.value)}/>
+                    <label>Off Peak (฿/kWh)</label>
+                    <input type="number" step="0.01" min="0" value={data.off_peak||""} onChange={e=>setField(station,"off_peak",e.target.value)}/>
                   </div>
                   <div className="rate-input-group">
                     <label>Off Peak เวลา</label>
@@ -780,11 +843,14 @@ function AdminPanel({rates,setRates,api}){
                 <div className="rate-inputs">
                   <div className="rate-input-group">
                     <label>ราคา (฿/kWh)</label>
-                    <input type="number" step="0.01" value={data.flat||""} onChange={e=>setField(station,"flat",e.target.value)}/>
+                    <input type="number" step="0.01" min="0" value={data.flat||""} onChange={e=>setField(station,"flat",e.target.value)}/>
                   </div>
                 </div>
               )}
-              <button className="icon-btn danger" onClick={()=>deleteStation(station)} title="ลบสถานี">{I.trash}</button>
+              <div style={{display:"flex",gap:4}}>
+                <button className="icon-btn" onClick={()=>startEdit(station)} title="แก้ไขชื่อ/สี">{I.edit}</button>
+                <button className="icon-btn danger" onClick={()=>deleteStation(station)} title="ลบสถานี">{I.trash}</button>
+              </div>
             </div>
           );
         })}
@@ -831,9 +897,10 @@ class ErrorBoundary extends React.Component {
 
 // ── App ─────────────────────────────────────────────────────────
 function App(){
-  const [cfg,setCfg]         = useState(loadCfg);
+  const [authed,setAuthed]   = useState(isSessionActive);
+  const [cfg]                = useState(loadCfg);
   const [rates,setRates]     = useState(loadRates);
-  const [entries,setEntries] = useState(()=>DEMO_ENTRIES);
+  const [entries,setEntries] = useState([]);
   const [status,setStatus]   = useState("idle");
   const [errMsg,setErrMsg]   = useState("");
   const [tab,setTab]         = useState("รายการ");
@@ -842,10 +909,19 @@ function App(){
   const [saving,setSaving]   = useState(false);
   const [toast,setToast]     = useState("");
   const [mf,setMf]           = useState(null);
+  const _now = new Date();
+  const [statYear,setStatYear]   = useState(_now.getFullYear());
+  const [statMonth,setStatMonth] = useState(_now.getMonth()+1);
 
   const api = useMemo(()=>cfg.url&&cfg.key?makeApi(cfg.url,cfg.key):null,[cfg.url,cfg.key]);
   const hasCfg = !!(cfg.url&&cfg.key);
   const visibleEntries = entries;
+
+  const statYears = useMemo(()=>[...new Set(entries.map(e=>+e.date.slice(0,4)))].sort((a,b)=>b-a),[entries]);
+  const statMonthsInYear = useMemo(()=>new Set(entries.filter(e=>+e.date.slice(0,4)===statYear).map(e=>+e.date.slice(5,7))),[entries,statYear]);
+  const statsEntries = useMemo(()=>entries.filter(e=>+e.date.slice(0,4)===statYear&&+e.date.slice(5,7)===statMonth),[entries,statYear,statMonth]);
+  const yearEntries  = useMemo(()=>entries.filter(e=>+e.date.slice(0,4)===statYear),[entries,statYear]);
+  const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),1800);};
 
   const load=useCallback(async()=>{
@@ -855,17 +931,15 @@ function App(){
       const [data,rData]=await Promise.all([api.fetchAll(), api.fetchRates()]);
       setEntries(data);
       if(rData&&rData.length){
-        const merged={...loadRates()};
-        rData.forEach(r=>{ merged[r.station]={...(merged[r.station]||{}),...rateFromDb(r)}; });
-        setRates(merged); saveRates(merged);
+        const fromDb={};
+        rData.forEach(r=>{ fromDb[r.station]=rateFromDb(r); });
+        setRates(fromDb); saveRates(fromDb);
       }
       setStatus("ok");
     }catch(e){setErrMsg(e.message);setStatus("err");}
   },[api]);
 
   useEffect(()=>{if(api) load();},[load]);
-
-  const handleSetup=(url,key)=>{ const c={url,key}; saveCfg(c); setCfg(c); setTab("รายการ"); };
 
   const onSave=async(form)=>{
     if(!api){
@@ -915,64 +989,71 @@ function App(){
     showToast("ส่งออก CSV แล้ว");
   };
 
+  if (!authed) return <LoginScreen onAuth={()=>setAuthed(true)}/>;
+
+  const handleLogout = () => { clearSession(); setAuthed(false); };
+
   return(
     <div className="app">
       {/* Top bar */}
       <div className="topbar">
         <div className="brand">
           <div className="logo">{I.bolt}</div>
-          <div><h1>EV Charging Log</h1><div className="sub">บันทึกการชาร์จรถไฟฟ้า · Toyota bZ4X</div></div>
+          <div><h1>Charge Note</h1><div className="sub">บันทึกการชาร์จรถไฟฟ้า · Deepal S07</div></div>
+          {hasCfg&&status==="err"&&<span className="status-badge st-err"><span className="dot"/>เชื่อมต่อไม่ได้</span>}
+        </div>
+        <div className="nav">
+          {["รายการ","สถิติ","สถานี"].map(t=>(
+            <button key={t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{t}</button>
+          ))}
         </div>
         <div className="actions">
-          {hasCfg&&status==="ok"&&<span className="status-badge st-ok"><span className="dot"/>Supabase</span>}
-          {hasCfg&&status==="loading"&&<span className="status-badge st-load"><span className="dot"/>กำลังโหลด</span>}
-          {hasCfg&&status==="err"&&<span className="status-badge st-err"><span className="dot"/>เชื่อมต่อไม่ได้</span>}
-          <div className="nav">
-            {["รายการ","สถิติ","สถานี","ตั้งค่า"].map(t=>(
-              <button key={t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{t}</button>
-            ))}
-          </div>
-          {tab==="รายการ"&&(
-            <>
-              <button className="btn btn-ghost" onClick={onExport}>{I.dl} ส่งออก</button>
-              <button className="btn btn-primary" onClick={()=>setModal("new")}>{I.plus} เพิ่มรายการ</button>
-            </>
-          )}
+          {tab==="รายการ"&&<button className="btn btn-primary" onClick={()=>setModal("new")}>{I.plus} เพิ่มรายการ</button>}
+          {tab==="รายการ"&&<button className="btn btn-ghost" onClick={onExport}>{I.dl} ส่งออก</button>}
+          <button className="btn btn-ghost" onClick={handleLogout} title="ออกจากระบบ">↩</button>
         </div>
       </div>
 
       {/* Error bar */}
       {errMsg&&<div className="err-bar"><span>⚠️ {errMsg}</span><button onClick={()=>setErrMsg("")}>×</button></div>}
 
-      {tab==="ตั้งค่า"&&<SetupPanel onSave={handleSetup}/>}
-
       {/* Station tab */}
       {tab==="สถานี"&&<AdminPanel rates={rates} setRates={setRates} api={api}/>}
 
       {tab==="สถิติ"&&(
         <>
-          <StatCards entries={visibleEntries}/>
+          {/* Year / Month filter */}
+          <div className="stat-filter">
+            <div className="chip-group">
+              {statYears.map(y=>(
+                <button key={y} className={statYear===y?"on":""} onClick={()=>{setStatYear(y);setStatMonth(m=>statMonthsInYear.has(m)?m:1);}}>{y}</button>
+              ))}
+            </div>
+            <div className="chip-group">
+              {MONTHS.map((lbl,i)=>{
+                const m=i+1;
+                return <button key={m} className={statMonth===m?"on":""} disabled={!statMonthsInYear.has(m)} onClick={()=>setStatMonth(m)}>{lbl}</button>;
+              })}
+            </div>
+          </div>
+          <StatCards entries={statsEntries}/>
           <div className="panels">
-            <ChartPanel entries={visibleEntries} monthFilter={mf} setMonthFilter={setMf}/>
-            <BreakdownPanel entries={visibleEntries} rates={rates}/>
+            <ChartPanel 
+              entries={yearEntries} 
+              monthFilter={`${statYear}-${String(statMonth).padStart(2,"0")}`} 
+              setMonthFilter={(val)=>{
+                if(!val) return;
+                const [y, m] = val.split("-");
+                setStatYear(+y); setStatMonth(+m);
+              }}/>
+            <BreakdownPanel entries={statsEntries} rates={rates}/>
           </div>
         </>
       )}
 
       {/* Main view */}
       {tab==="รายการ"&&(
-        <>
-          {visibleEntries.length>0&&(
-            <>
-              <StatCards entries={visibleEntries}/>
-              <div className="panels">
-                <ChartPanel entries={visibleEntries} monthFilter={mf} setMonthFilter={setMf}/>
-                <BreakdownPanel entries={visibleEntries} rates={rates}/>
-              </div>
-            </>
-          )}
-          <LogTable entries={visibleEntries} rates={rates} onEdit={e=>setModal(e)} onDelete={e=>setDel(e)} monthFilter={mf} setMonthFilter={setMf} loading={status==="loading"}/>
-        </>
+        <LogTable entries={visibleEntries} rates={rates} onEdit={e=>setModal(e)} onDelete={e=>setDel(e)} monthFilter={mf} setMonthFilter={setMf} loading={status==="loading"}/>
       )}
 
       {/* Modals */}
