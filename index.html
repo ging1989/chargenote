@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>EV Charging Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F8F1;--bg-2:#EAF3E8;--surface:#fff;--surface-soft:#F7FBF6;
+  --mint:#D9EFD2;--mint-2:#C5E5BD;--sage:#A8D5A0;--leaf:#7BBE74;
+  --leaf-2:#4F9F52;--leaf-deep:#2E7D32;--ink:#1B3A1F;--ink-2:#2F4E33;
+  --ink-3:#5A6E5C;--muted:#8AA08C;--line:#E1ECDE;--line-2:#D0E1CC;
+  --warn:#E8A33A;--danger:#D27676;
+  --shadow-sm:0 1px 0 rgba(40,80,40,.04),0 1px 2px rgba(40,80,40,.04);
+  --shadow:0 1px 0 rgba(255,255,255,.6) inset,0 8px 24px -12px rgba(46,125,50,.18),0 2px 6px -2px rgba(46,125,50,.10);
+  --font:"Noto Sans Thai","IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:radial-gradient(1200px 600px at 90% -10%,#DFF0DA,transparent 55%),radial-gradient(900px 500px at -10% 110%,#E6F2E1,transparent 60%),var(--bg)}
+.app{max-width:1280px;margin:0 auto;padding:28px 32px 80px}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#A8D5A0,#7BBE74);display:grid;place-items:center;box-shadow:var(--shadow);position:relative;overflow:hidden;flex-shrink:0}
+.logo::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.55),transparent 55%)}
+.logo svg{position:relative;z-index:1}
+.brand h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
+.brand .sub{font-size:12px;color:var(--ink-3);margin-top:2px}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* nav tabs */
+.tab-bar{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow-sm)}
+.tab-bar button{appearance:none;border:0;background:transparent;font-family:inherit;font-size:13px;color:var(--ink-2);padding:7px 14px;border-radius:999px;cursor:pointer;font-weight:500}
+.tab-bar button.on{background:var(--mint);color:var(--ink);box-shadow:0 1px 0 rgba(255,255,255,.7) inset}
+.tab-bar button:hover:not(.on){background:var(--surface-soft)}
+
+/* buttons */
+.btn{appearance:none;border:0;font-family:inherit;font-size:13px;font-weight:500;padding:9px 14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform .06s}
+.btn:active{transform:translateY(1px)}
+.btn-ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
+.btn-ghost:hover{background:var(--surface)}
+.btn-primary{background:var(--leaf-2);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 6px 14px -6px rgba(79,159,82,.55)}
+.btn-primary:hover{background:#458F47}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-danger{background:var(--danger);color:#fff;border:0}
+.btn-danger:hover{background:#BF5E5E}
+
+/* status */
+.status-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;border-radius:999px;padding:5px 12px;font-weight:500}
+.status-badge .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.st-ok{background:var(--mint);color:var(--leaf-deep)}.st-ok .dot{background:var(--leaf-2)}
+.st-err{background:#F4DEDE;color:#A85B5B}.st-err .dot{background:var(--danger)}
+.st-load{background:var(--surface-soft);color:var(--ink-3);border:1px solid var(--line)}.st-load .dot{background:var(--muted);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* setup */
+.setup-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 32px;margin-bottom:24px;box-shadow:var(--shadow-sm)}
+.setup-card h2{margin:0 0 6px;font-size:17px;font-weight:600}
+.setup-card p{margin:0 0 20px;font-size:13px;color:var(--ink-3);line-height:1.7}
+.setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12px;color:var(--ink-2);font-weight:500}
+.field input,.field select,.field textarea{appearance:none;font-family:inherit;font-size:14px;color:var(--ink);background:var(--surface-soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;transition:border-color .12s,background .12s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--sage);background:#fff;box-shadow:0 0 0 3px rgba(168,213,160,.3)}
+.field .hint{font-size:11px;color:var(--muted)}
+.field.computed input{background:var(--mint);color:var(--ink);font-weight:600;border-color:var(--mint-2)}
+.field input[readonly]{background:var(--surface-soft);color:var(--ink-3);cursor:default}
+.sql-block{background:#1B3A1F;color:#A8D5A0;font-family:var(--mono);font-size:12px;line-height:1.8;padding:16px 20px;border-radius:10px;overflow-x:auto;margin:16px 0 0;white-space:pre}
+.collapse-btn{appearance:none;border:0;background:transparent;font-family:inherit;font-size:12px;color:var(--leaf-2);cursor:pointer;padding:0;margin-top:14px;display:inline-flex;align-items:center;gap:4px;font-weight:500}
+.collapse-btn:hover{text-decoration:underline}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+.stat .lbl{font-size:12px;color:var(--ink-3)}
+.stat .val{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:8px;font-variant-numeric:tabular-nums}
+.stat .val small{font-size:14px;color:var(--ink-3);font-weight:500;margin-left:4px}
+.stat .delta{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--leaf-2);background:var(--mint);padding:3px 8px;border-radius:999px;margin-top:8px;font-weight:500}
+.stat .delta.down{color:#A85B5B;background:#F4DEDE}
+.stat .accent{position:absolute;right:-20px;top:-20px;width:90px;height:90px;border-radius:50%;background:radial-gradient(circle,var(--mint),transparent 70%);opacity:.7}
+
+/* panels */
+.panels{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:18px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow-sm)}
+.panel-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.panel h3{margin:0 0 4px;font-size:14px;font-weight:600}
+.panel .psub{font-size:12px;color:var(--ink-3)}
+.chip-group{display:flex;gap:4px;background:var(--surface-soft);border:1px solid var(--line);border-radius:10px;padding:3px}
+.chip-group button{appearance:none;border:0;background:transparent;font-family:inherit;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer;color:var(--ink-3);font-weight:500}
+.chip-group button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
+.chip-group.sm button{font-size:11px;padding:4px 8px}
+.chart{height:200px;display:flex;align-items:stretch;gap:10px;padding-top:10px;border-bottom:1px dashed var(--line-2);padding-bottom:24px}
+.bar-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;position:relative;transition:opacity .15s;cursor:pointer}
+.bar-wrap.dim{opacity:.35}
+.bar-wrap.active .bseg{background:var(--leaf-2)!important;box-shadow:0 0 0 2px rgba(79,159,82,.18)}
+.bar-wrap.active .blbl{color:var(--ink);font-weight:600}
+.bar-wrap.active .bamt{opacity:1}
+.bstack{width:100%;border-radius:8px 8px 4px 4px;overflow:hidden;transition:transform .15s;min-height:4px;flex-shrink:0}
+.bar-wrap:hover .bstack{transform:translateY(-2px)}
+.bseg{width:100%;height:100%;background:var(--sage);display:block;transition:background .12s}
+.bar-wrap:hover .bseg{background:var(--leaf)!important}
+.blbl{font-size:11px;color:var(--ink-3);font-weight:500;position:absolute;bottom:-22px;left:0;right:0;text-align:center}
+.bamt{font-size:10px;color:var(--ink-2);font-variant-numeric:tabular-nums;opacity:0;transition:opacity .15s;font-weight:500}
+.bar-wrap:hover .bamt{opacity:1}
+.chart-foot{margin-top:18px;font-size:12px;color:var(--ink-3);min-height:20px;display:flex;align-items:center}
+.link-btn{appearance:none;border:0;background:transparent;font-family:inherit;font-size:12px;color:var(--leaf-2);cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px}
+.link-btn b{font-weight:600;color:var(--ink)}
+.link-btn:hover{text-decoration:underline}
+.bd-list{display:flex;flex-direction:column;gap:12px}
+.bd-row{display:flex;align-items:center;gap:12px}
+.bd-dot{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:600;font-size:12px;flex-shrink:0}
+.bd-info{flex:1;min-width:0}
+.bd-name{font-size:13px;font-weight:500}
+.bd-meta{font-size:11px;color:var(--ink-3);margin-top:1px}
+.bd-bar{height:4px;background:var(--bg-2);border-radius:2px;margin-top:6px;overflow:hidden}
+.bd-bar i{display:block;height:100%;border-radius:2px}
+.bd-amt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.bd-pct{font-size:11px;color:var(--ink-3);text-align:right;margin-top:1px}
+
+/* table */
+.table-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);overflow:hidden}
+.table-top{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
+.table-top h3{margin:0;font-size:14px;font-weight:600}
+.table-top .tsub{font-size:12px;color:var(--ink-3);margin-top:2px}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface-soft);border:1px solid var(--line);border-radius:10px;padding:7px 12px;width:220px}
+.search-box input{border:0;background:transparent;outline:none;font-family:inherit;font-size:13px;color:var(--ink);width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.mpill{display:inline-flex;align-items:center;gap:6px;background:var(--mint);color:var(--ink);padding:2px 4px 2px 10px;border-radius:999px;font-size:11px;font-weight:500;margin-left:8px}
+.mpill button{appearance:none;border:0;background:rgba(0,0,0,.08);color:var(--ink);width:16px;height:16px;border-radius:50%;cursor:pointer;font-size:12px;display:grid;place-items:center;padding:0}
+.twrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
+thead th{text-align:left;font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:12px 16px;background:var(--surface-soft);border-bottom:1px solid var(--line);user-select:none;cursor:pointer;white-space:nowrap}
+thead th:hover{color:var(--ink)}
+.si{margin-left:4px;opacity:.5;font-size:9px}
+thead th.sorted .si{opacity:1;color:var(--leaf-2)}
+thead th.num,tbody td.num{text-align:right}
+tbody tr{border-bottom:1px solid var(--line);transition:background .12s}
+tbody tr:last-child{border-bottom:0}
+tbody tr:hover{background:var(--surface-soft)}
+tbody td{padding:12px 16px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.date-cell{color:var(--ink)!important;font-weight:500;white-space:nowrap}
+.st-cell{display:flex;align-items:center;gap:10px}
+.badge{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0}
+.peak-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600}
+.peak-on{background:#FFF3CD;color:#9A6400}
+.peak-off{background:#E8F5E9;color:#2E7D32}
+.trip-chip{display:inline-flex;align-items:center;gap:4px;background:var(--mint);color:var(--ink-2);font-size:11px;padding:2px 8px;border-radius:999px;font-weight:500}
+.row-actions{display:flex;gap:4px;justify-content:flex-end}
+.icon-btn{appearance:none;border:0;background:transparent;width:28px;height:28px;border-radius:7px;cursor:pointer;color:var(--ink-3);display:grid;place-items:center}
+.icon-btn:hover{background:var(--mint);color:var(--ink)}
+.icon-btn.danger:hover{background:#F4DEDE;color:#A85B5B}
+.empty{padding:60px 20px;text-align:center;color:var(--ink-3);font-size:13px}
+.spinner{width:28px;height:28px;border:2.5px solid var(--line);border-top-color:var(--leaf-2);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(27,58,31,.32);backdrop-filter:blur(6px);z-index:50;display:grid;place-items:center;padding:24px;animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border-radius:18px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px -20px rgba(27,58,31,.4);animation:popIn .2s ease}
+@keyframes popIn{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+.modal-hd{padding:20px 24px 4px;position:sticky;top:0;background:var(--surface);z-index:1;border-bottom:1px solid var(--line)}
+.modal-hd h2{margin:0;font-size:18px;font-weight:600}
+.modal-hd p{margin:4px 0 0;font-size:13px;color:var(--ink-3)}
+.modal-body{padding:20px 24px 8px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.modal-body .full{grid-column:1/-1}
+.modal-ft{display:flex;justify-content:space-between;align-items:center;padding:16px 24px 20px;border-top:1px solid var(--line);background:var(--surface-soft);position:sticky;bottom:0}
+.modal-ft .fleft{font-size:12px;color:var(--ink-3)}
+
+/* peak selector */
+.peak-selector{display:flex;gap:8px}
+.peak-btn{flex:1;appearance:none;border:2px solid var(--line);border-radius:12px;background:var(--surface-soft);font-family:inherit;cursor:pointer;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .12s}
+.peak-btn:hover{border-color:var(--sage)}
+.peak-btn.on-sel{border-color:#E8A33A;background:#FFFBF0}
+.peak-btn.off-sel{border-color:var(--leaf-2);background:#F0FAF0}
+.peak-btn .pb-icon{font-size:18px}
+.peak-btn .pb-label{font-size:12px;font-weight:600;color:var(--ink)}
+.peak-btn .pb-price{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.peak-btn .pb-time{font-size:10px;color:var(--muted);margin-top:1px}
+
+/* rate card (flat) */
+.rate-card{background:var(--mint);border:1px solid var(--mint-2);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
+.rate-card .rc-label{font-size:12px;color:var(--ink-3);font-weight:500}
+.rate-card .rc-price{font-size:18px;font-weight:700;color:var(--leaf-deep);font-variant-numeric:tabular-nums}
+.rate-card .rc-unit{font-size:11px;color:var(--ink-3);margin-top:2px}
+
+/* snapshot badge */
+.snap-info{font-size:11px;color:var(--ink-3);display:flex;align-items:center;gap:6px;margin-top:6px}
+.snap-info .sdot{width:5px;height:5px;border-radius:50%;background:var(--leaf-2)}
+
+/* err bar */
+.err-bar{background:#F4DEDE;border:1px solid var(--danger);border-radius:10px;padding:12px 16px;font-size:13px;color:#7A3030;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.err-bar button{appearance:none;border:0;background:transparent;cursor:pointer;color:#7A3030;font-size:16px}
+
+/* confirm */
+.confirm-box{background:var(--surface);border-radius:16px;width:100%;max-width:360px;padding:24px;box-shadow:0 20px 60px -20px rgba(27,58,31,.4);animation:popIn .2s ease}
+.confirm-box h3{margin:0 0 8px;font-size:16px;font-weight:600}
+.confirm-box p{margin:0 0 20px;font-size:13px;color:var(--ink-3);line-height:1.65}
+.confirm-box .ca{display:flex;gap:8px;justify-content:flex-end}
+
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px -10px rgba(0,0,0,.4);z-index:60;white-space:nowrap;animation:toastIn .2s ease}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* admin */
+.admin-grid{display:grid;gap:12px}
+.rate-row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-sm)}
+.rate-row .rr-name{flex:1}
+.rate-row .rr-sname{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px}
+.rate-row .rr-sub{font-size:12px;color:var(--ink-3);margin-top:3px}
+.rate-inputs{display:flex;gap:10px;align-items:flex-end}
+.rate-input-group{display:flex;flex-direction:column;gap:4px}
+.rate-input-group label{font-size:11px;color:var(--ink-3);font-weight:500;white-space:nowrap}
+.rate-input-group input{width:90px;appearance:none;font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--surface-soft);border:1px solid var(--line);border-radius:8px;padding:7px 10px;outline:none;transition:border-color .12s}
+.rate-input-group input:focus{border-color:var(--sage);background:#fff;box-shadow:0 0 0 3px rgba(168,213,160,.3)}
+
+@media(max-width:900px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .panels{grid-template-columns:1fr}
+  .app{padding:16px 16px 80px}
+  .search-box{width:100%}
+  .setup-grid,.modal-body{grid-template-columns:1fr}
+  .modal-body .full{grid-column:1}
+  .rate-row{flex-direction:column;align-items:flex-start}
+  .rate-inputs{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script type="text/babel">
+const { useState, useMemo, useEffect, useCallback, useRef } = React;
+
+// ── Config ──────────────────────────────────────────────────────
+const CFG_KEY   = "ev_supabase_cfg";
+const RATES_KEY = "ev_station_rates";   // local cache ของ rates
+const TABLE     = "charging_sessions";
+const RTABLE    = "station_rates";
+
+// ── Default station rates ───────────────────────────────────────
+// type: "peak" → มี on_peak + off_peak
+// type: "flat" → ราคาเดียว
+const DEFAULT_RATES = {
+  "PTT":            { type:"peak", on_peak:8.29, off_peak:5.49, on_time:"09:00–22:00", off_time:"22:00–09:00", color:"#E8A33A", abbr:"PT" },
+  "PEA VOLTA":      { type:"peak", on_peak:7.98, off_peak:5.48, on_time:"09:00–22:00", off_time:"22:00–09:00", color:"#7BBE74", abbr:"PV" },
+  "iGreen+":        { type:"peak", on_peak:8.50, off_peak:5.90, on_time:"09:00–22:00", off_time:"22:00–09:00", color:"#3E8B6A", abbr:"IG" },
+  "EleX":           { type:"flat", flat:7.50, color:"#4F9F52", abbr:"EX" },
+  "Elexa":          { type:"flat", flat:7.50, color:"#4F9F52", abbr:"EX" },
+  "EA Anywhere":    { type:"flat", flat:7.50, color:"#A8D5A0", abbr:"EA" },
+  "MEA EV":         { type:"flat", flat:6.50, color:"#5BA88E", abbr:"ME" },
+  "EV Station Pluz":{ type:"flat", flat:7.80, color:"#3E8B6A", abbr:"PZ" },
+  "Sharge":         { type:"flat", flat:8.00, color:"#6CAE76", abbr:"SH" },
+  "ReverSharger":   { type:"flat", flat:7.20, color:"#7A5AE0", abbr:"RS" },
+};
+
+// ── Storage helpers ─────────────────────────────────────────────
+const loadCfg   = () => { try{ return JSON.parse(localStorage.getItem(CFG_KEY))||{}; }catch(e){ return {}; } };
+const saveCfg   = c  => localStorage.setItem(CFG_KEY, JSON.stringify(c));
+const loadRates = () => { try{ const r=JSON.parse(localStorage.getItem(RATES_KEY)); return r||DEFAULT_RATES; }catch(e){ return DEFAULT_RATES; } };
+const saveRates = r  => localStorage.setItem(RATES_KEY, JSON.stringify(r));
+
+// ── Helpers ─────────────────────────────────────────────────────
+const THB  = n => "฿"+Number(n||0).toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const NUM  = (n,d=2) => Number(n||0).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const mKey = d => d.slice(0,7);
+const mLbl = k => { const [y,m]=k.split("-"); return ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."][+m-1]+" "+String(+y+543).slice(-2); };
+const dLbl = d => { const dt=new Date(d+"T00:00:00"),mo=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."]; return dt.getDate()+" "+mo[dt.getMonth()]+" "+String(dt.getFullYear()+543).slice(-2); };
+const smeta = (name,rates) => rates[name] || { type:"flat", flat:0, color:"#8AA08C", abbr:(name||"??").slice(0,2).toUpperCase() };
+
+// ── Supabase API ────────────────────────────────────────────────
+function makeApi(url, key) {
+  const base = url.replace(/\/$/,"")+"/rest/v1";
+  const H = {"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key};
+  const ok = async r => { if(!r.ok) throw new Error((await r.json()).message||r.statusText); };
+  return {
+    async fetchAll(){
+      const r=await fetch(`${base}/${TABLE}?select=*&order=date.desc`,{headers:{...H,"Prefer":"return=representation"}});
+      await ok(r); return r.json();
+    },
+    async insert(row){
+      const r=await fetch(`${base}/${TABLE}`,{method:"POST",headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(row)});
+      await ok(r); const d=await r.json(); return Array.isArray(d)?d[0]:d;
+    },
+    async update(id,row){
+      const r=await fetch(`${base}/${TABLE}?id=eq.${id}`,{method:"PATCH",headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(row)});
+      await ok(r); const d=await r.json(); return Array.isArray(d)?d[0]:d;
+    },
+    async remove(id){
+      const r=await fetch(`${base}/${TABLE}?id=eq.${id}`,{method:"DELETE",headers:H});
+      await ok(r);
+    },
+    async ping(){ const r=await fetch(`${base}/${TABLE}?select=id&limit=1`,{headers:H}); await ok(r); return true; },
+    async fetchRates(){
+      const r=await fetch(`${base}/${RTABLE}?select=*`,{headers:H});
+      if(!r.ok) return null; // table might not exist yet
+      return r.json();
+    },
+    async upsertRate(station, data){
+      const r=await fetch(`${base}/${RTABLE}`,{method:"POST",headers:{...H,"Prefer":"return=representation,resolution=merge-duplicates"},body:JSON.stringify({station,...data})});
+      await ok(r);
+    },
+  };
+}
+
+// ── Icons ───────────────────────────────────────────────────────
+const I={
+  bolt:    <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>,
+  plus:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>,
+  search:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>,
+  edit:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>,
+  trash:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6 18 20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>,
+  dl:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>,
+  trend:   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 4 4 6-7"/><path d="M22 6h-6"/></svg>,
+  trendDn: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 4-4 6 7"/><path d="M22 18h-6"/></svg>,
+  rf:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>,
+  gear:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+};
+
+// ── SQL ─────────────────────────────────────────────────────────
+const SQL=`-- 1) ตารางบันทึกการชาร์จ
+create table charging_sessions (
+  id                bigint generated always as identity primary key,
+  date              date          not null,
+  station           text          not null,
+  trip              text,
+  peak_type         text,          -- 'on_peak' | 'off_peak' | null (flat)
+  price_before_disc numeric(10,2) not null,
+  kwh               numeric(10,2) not null,
+  discount          numeric(10,2) not null default 0,
+  final_price       numeric(10,2) generated always as
+                    (price_before_disc - discount) stored,
+  baht_per_kwh      numeric(10,4) generated always as
+                    (case when kwh > 0
+                     then (price_before_disc - discount) / kwh
+                     else 0 end) stored,
+  rate_snapshot     jsonb,         -- snapshot ราคา ณ วันที่ชาร์จ
+  created_at        timestamptz default now()
+);
+alter table charging_sessions enable row level security;
+create policy "allow all" on charging_sessions
+  for all using (true) with check (true);
+
+-- 2) ตารางราคาสถานี (admin แก้ได้)
+create table station_rates (
+  station     text primary key,
+  rate_type   text not null,       -- 'peak' | 'flat'
+  on_peak     numeric(10,2),
+  off_peak    numeric(10,2),
+  on_time     text,
+  off_time    text,
+  flat        numeric(10,2),
+  updated_at  timestamptz default now()
+);
+alter table station_rates enable row level security;
+create policy "allow all" on station_rates
+  for all using (true) with check (true);`;
+
+// ── Setup ───────────────────────────────────────────────────────
+function SetupPanel({ onSave }) {
+  const [url,setUrl]=useState(""); const [key,setKey]=useState("");
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [sql,setSql]=useState(false);
+  const test=async()=>{
+    if(!url||!key){setErr("กรุณากรอก URL และ API Key");return;}
+    setBusy(true);setErr("");
+    try{ await makeApi(url,key).ping(); onSave(url,key); }
+    catch(e){ setErr("เชื่อมต่อไม่ได้: "+e.message); }
+    setBusy(false);
+  };
+  return (
+    <div className="setup-card">
+      <h2>🔌 เชื่อมต่อ Supabase</h2>
+      <p>กรอก Project URL และ anon key — ระบบจะจำไว้ใน browser นี้<br/>ถ้ายังไม่มี table ให้รัน SQL ด้านล่างใน <strong>Supabase → SQL Editor</strong> ก่อน</p>
+      <div className="setup-grid">
+        <div className="field" style={{gridColumn:"1/-1"}}>
+          <label>Project URL</label>
+          <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://xxxxxxxxxxxx.supabase.co"/>
+          <span className="hint">Settings → API → Project URL</span>
+        </div>
+        <div className="field" style={{gridColumn:"1/-1"}}>
+          <label>anon / public Key</label>
+          <input value={key} onChange={e=>setKey(e.target.value)} placeholder="eyJhbGci…" type="password"/>
+          <span className="hint">Settings → API → anon public</span>
+        </div>
+      </div>
+      {err&&<div style={{fontSize:12,color:"#A85B5B",marginTop:10}}>⚠️ {err}</div>}
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        <button className="btn btn-primary" onClick={test} disabled={busy}>{busy?"กำลังทดสอบ…":"ทดสอบและบันทึก"}</button>
+      </div>
+      <button className="collapse-btn" onClick={()=>setSql(v=>!v)}>{sql?"▼":"▶"} SQL สำหรับสร้าง tables</button>
+      {sql&&(
+        <div style={{position:"relative"}}>
+          <pre className="sql-block">{SQL}</pre>
+          <button className="btn btn-ghost" style={{position:"absolute",top:8,right:8,fontSize:11,padding:"4px 10px"}} onClick={()=>navigator.clipboard?.writeText(SQL)}>คัดลอก</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Stat Cards ──────────────────────────────────────────────────
+function StatCards({entries}){
+  const s=useMemo(()=>{
+    const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
+    const now=sorted.length?sorted[0].date.slice(0,7):mKey(new Date().toISOString());
+    const prev=(()=>{const d=new Date(now+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
+    const tm=entries.filter(e=>e.date.startsWith(now)), pm=entries.filter(e=>e.date.startsWith(prev));
+    const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
+    const tmK=sum(tm,"kwh"),pmK=sum(pm,"kwh"),tmC=sum(tm,"final_price"),pmC=sum(pm,"final_price");
+    const pct=(a,b)=>b?((a-b)/b)*100:0;
+    return{tmKwh:tmK,tmCost:tmC,tmAvg:tmK?tmC/tmK:0,tmDisc:sum(tm,"discount"),sessions:tm.length,kD:pct(tmK,pmK),cD:pct(tmC,pmC)};
+  },[entries]);
+  const cards=[
+    {lbl:"พลังงานเดือนนี้",val:NUM(s.tmKwh,2),suffix:"kWh",delta:s.kD},
+    {lbl:"ค่าใช้จ่ายเดือนนี้",val:THB(s.tmCost),delta:s.cD,invert:true},
+    {lbl:"ราคาเฉลี่ย",val:NUM(s.tmAvg,2),suffix:"฿/kWh"},
+    {lbl:"ส่วนลดรวมเดือนนี้",val:THB(s.tmDisc),isPos:true},
+  ];
+  return(
+    <div className="stats">
+      {cards.map((c,i)=>(
+        <div className="stat" key={i}>
+          <div className="accent"/>
+          <div className="lbl">{c.lbl}</div>
+          <div className="val">{c.val}{c.suffix&&<small>{" "+c.suffix}</small>}</div>
+          {c.delta!==undefined&&Math.abs(c.delta)>0.1&&(
+            <div className={"delta "+((c.invert?c.delta<0:c.delta>0)?"":"down")}>
+              {c.delta>=0?I.trend:I.trendDn}{(c.delta>=0?"+":"")+c.delta.toFixed(1)}% vs. เดือนก่อน
+            </div>
+          )}
+          {c.isPos&&<div className="delta">{s.sessions} ครั้ง · เดือนนี้</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Chart ───────────────────────────────────────────────────────
+function ChartPanel({entries,monthFilter,setMonthFilter}){
+  const [range,setRange]=useState("6");
+  const data=useMemo(()=>{
+    const by={};
+    entries.forEach(e=>{
+      const k=mKey(e.date);
+      if(!by[k]) by[k]={cost:0,kwh:0,n:0};
+      by[k].cost+=+e.final_price||0; by[k].kwh+=+e.kwh||0; by[k].n++;
+    });
+    const all=Object.entries(by).sort(([a],[b])=>a<b?-1:1).map(([k,v])=>({key:k,...v}));
+    return range==="all"?all:all.slice(-(+range));
+  },[entries,range]);
+  const max=Math.max(...data.map(d=>d.cost),1);
+  const totC=data.reduce((a,d)=>a+d.cost,0), totK=data.reduce((a,d)=>a+d.kwh,0);
+  return(
+    <div className="panel">
+      <div className="panel-hd">
+        <div><h3>ค่าใช้จ่ายรายเดือน</h3><div className="psub">{data.length} เดือน · {THB(totC)} · {NUM(totK,1)} kWh</div></div>
+        <div className="chip-group sm">
+          {[["3","3ด."],["6","6ด."],["12","12ด."],["all","ทั้งหมด"]].map(([v,l])=>(
+            <button key={v} className={range===v?"on":""} onClick={()=>setRange(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="chart">
+        {data.map(d=>{
+          const act=monthFilter===d.key, dim=monthFilter&&monthFilter!==d.key;
+          return(
+            <div key={d.key} className={"bar-wrap "+(act?"active ":"")+(dim?"dim ":"")} onClick={()=>setMonthFilter(monthFilter===d.key?null:d.key)} title={`${mLbl(d.key)} · ${THB(d.cost)} · ${d.n}ครั้ง`}>
+              <div className="bamt">{THB(d.cost)}</div>
+              <div className="bstack" style={{height:(d.cost/max*100)+"%"}}><span className="bseg"/></div>
+              <div className="blbl">{mLbl(d.key)}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="chart-foot">
+        {monthFilter
+          ?<button className="link-btn" onClick={()=>setMonthFilter(null)}>กำลังกรองเฉพาะ <b>{mLbl(monthFilter)}</b> · ยกเลิก</button>
+          :<span style={{opacity:.7}}>คลิกแท่งกราฟเพื่อกรองเดือนนั้น</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Breakdown ───────────────────────────────────────────────────
+function BreakdownPanel({entries,rates}){
+  const bd=useMemo(()=>{
+    const by={};
+    entries.forEach(e=>{
+      if(!by[e.station]) by[e.station]={kwh:0,cost:0,n:0};
+      by[e.station].kwh+=+e.kwh||0; by[e.station].cost+=+e.final_price||0; by[e.station].n++;
+    });
+    const tot=Object.values(by).reduce((a,v)=>a+v.cost,0);
+    return Object.entries(by).map(([k,v])=>({key:k,...v,pct:tot?v.cost/tot*100:0})).sort((a,b)=>b.cost-a.cost).slice(0,6);
+  },[entries]);
+  return(
+    <div className="panel">
+      <h3>สัดส่วนตามสถานี</h3>
+      <div className="psub" style={{marginBottom:14}}>ยอดรวมตลอดประวัติ</div>
+      <div className="bd-list">
+        {bd.map(b=>{
+          const s=smeta(b.key,rates);
+          return(
+            <div className="bd-row" key={b.key}>
+              <div className="bd-dot" style={{background:s.color+"28",color:s.color}}>{s.abbr}</div>
+              <div className="bd-info">
+                <div className="bd-name">{b.key}</div>
+                <div className="bd-meta">{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
+                <div className="bd-bar"><i style={{width:b.pct+"%",background:s.color}}/></div>
+              </div>
+              <div><div className="bd-amt">{THB(b.cost)}</div><div className="bd-pct">{b.pct.toFixed(1)}%</div></div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Log Table ────────────────────────────────────────────────────
+function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,loading}){
+  const [q,setQ]=useState(""); const [filter,setFilter]=useState("ทั้งหมด"); const [sort,setSort]=useState({key:"date",dir:"desc"});
+  const filtered=useMemo(()=>{
+    let r=entries;
+    if(monthFilter) r=r.filter(e=>e.date.startsWith(monthFilter));
+    if(filter==="มีส่วนลด") r=r.filter(e=>+e.discount>0);
+    if(filter==="ทริป") r=r.filter(e=>e.trip);
+    if(filter==="On Peak") r=r.filter(e=>e.peak_type==="on_peak");
+    if(filter==="Off Peak") r=r.filter(e=>e.peak_type==="off_peak");
+    if(q){const Q=q.toLowerCase();r=r.filter(e=>(e.station+" "+(e.trip||"")).toLowerCase().includes(Q));}
+    const{key,dir}=sort,sgn=dir==="asc"?1:-1;
+    return[...r].sort((a,b)=>{const va=a[key]??0,vb=b[key]??0;if(va<vb)return-sgn;if(va>vb)return sgn;return 0;});
+  },[entries,q,filter,sort,monthFilter]);
+  const setK=k=>setSort(s=>s.key===k?{key:k,dir:s.dir==="asc"?"desc":"asc"}:{key:k,dir:"desc"});
+  const Hdr=({label,k,align="left"})=>(
+    <th className={(sort.key===k?"sorted ":"")+(align==="right"?"num":"")} onClick={()=>setK(k)}>
+      {label}<span className="si">{sort.key===k?(sort.dir==="asc"?"▲":"▼"):"▲▼"}</span>
+    </th>
+  );
+  return(
+    <div className="table-card">
+      <div className="table-top">
+        <div>
+          <h3>รายการชาร์จ</h3>
+          <div className="tsub">
+            {filtered.length} รายการ
+            {monthFilter&&<span className="mpill">{mLbl(monthFilter)} <button onClick={()=>setMonthFilter(null)}>×</button></span>}
+          </div>
+        </div>
+        <div className="filters">
+          <div className="chip-group">
+            {["ทั้งหมด","มีส่วนลด","ทริป","On Peak","Off Peak"].map(f=>(
+              <button key={f} className={filter===f?"on":""} onClick={()=>setFilter(f)}>{f}</button>
+            ))}
+          </div>
+          <div className="search-box">{I.search}<input placeholder="ค้นหาสถานี / ทริป…" value={q} onChange={e=>setQ(e.target.value)}/></div>
+        </div>
+      </div>
+      {loading?<div className="empty"><div className="spinner"/><div style={{marginTop:12}}>กำลังโหลด…</div></div>
+      :filtered.length===0?<div className="empty">ไม่พบรายการ</div>
+      :(
+        <div className="twrap">
+          <table>
+            <thead><tr>
+              <Hdr label="วันที่" k="date"/>
+              <Hdr label="สถานี" k="station"/>
+              <Hdr label="Peak" k="peak_type"/>
+              <Hdr label="ทริป" k="trip"/>
+              <Hdr label="kWh" k="kwh" align="right"/>
+              <Hdr label="ก่อนลด" k="price_before_disc" align="right"/>
+              <Hdr label="ส่วนลด" k="discount" align="right"/>
+              <Hdr label="ชำระ" k="final_price" align="right"/>
+              <Hdr label="฿/kWh" k="baht_per_kwh" align="right"/>
+              <th style={{width:80}}></th>
+            </tr></thead>
+            <tbody>
+              {filtered.map(e=>{
+                const s=smeta(e.station,rates);
+                return(
+                  <tr key={e.id}>
+                    <td className="date-cell">{dLbl(e.date)}</td>
+                    <td><div className="st-cell"><div className="badge" style={{background:s.color}}>{s.abbr}</div><div>{e.station}</div></div></td>
+                    <td>
+                      {e.peak_type==="on_peak"&&<span className="peak-pill peak-on">🌞 On Peak</span>}
+                      {e.peak_type==="off_peak"&&<span className="peak-pill peak-off">🌙 Off Peak</span>}
+                      {!e.peak_type&&<span style={{color:"var(--muted)"}}>—</span>}
+                    </td>
+                    <td>{e.trip?<span className="trip-chip">✈ {e.trip}</span>:<span style={{color:"var(--muted)"}}>—</span>}</td>
+                    <td className="num">{NUM(e.kwh,2)}</td>
+                    <td className="num">{THB(e.price_before_disc)}</td>
+                    <td className="num" style={{color:+e.discount>0?"var(--leaf-2)":"var(--muted)"}}>{+e.discount>0?"−"+THB(e.discount):"—"}</td>
+                    <td className="num" style={{fontWeight:600,color:"var(--ink)"}}>{THB(e.final_price)}</td>
+                    <td className="num" style={{color:"var(--ink-3)"}}>{NUM(e.baht_per_kwh,2)}</td>
+                    <td><div className="row-actions">
+                      <button className="icon-btn" onClick={()=>onEdit(e)}>{I.edit}</button>
+                      <button className="icon-btn danger" onClick={()=>onDelete(e)}>{I.trash}</button>
+                    </div></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Entry Modal ─────────────────────────────────────────────────
+function EntryModal({entry,rates,onClose,onSave,saving}){
+  const today=new Date().toISOString().slice(0,10);
+  const initStation=entry?.station||Object.keys(rates)[0]||"PTT";
+  const [form,setForm]=useState({
+    date:entry?.date||today,
+    station:initStation,
+    trip:entry?.trip||"",
+    kwh:entry?String(entry.kwh):"",
+    discount:entry?String(entry.discount):"0",
+    peak_type:entry?.peak_type||null,
+    price_before_disc:entry?String(entry.price_before_disc):"",
+  });
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  const stationRate=rates[form.station];
+  const isPeak=stationRate?.type==="peak";
+
+  // when station changes, reset peak selection and price
+  useEffect(()=>{
+    if(!entry){
+      set("peak_type",null);
+      set("price_before_disc","");
+    }
+  },[form.station]);
+
+  // auto-fill price when peak_type chosen
+  const selectPeak=(pt)=>{
+    set("peak_type",pt);
+    if(stationRate){
+      const rate=pt==="on_peak"?stationRate.on_peak:stationRate.off_peak;
+      if(rate&&form.kwh) set("price_before_disc",String((+form.kwh*rate).toFixed(2)));
+    }
+  };
+
+  // recalc price when kwh changes
+  useEffect(()=>{
+    if(form.peak_type&&stationRate&&form.kwh){
+      const rate=form.peak_type==="on_peak"?stationRate.on_peak:stationRate.off_peak;
+      if(rate) set("price_before_disc",String((+form.kwh*rate).toFixed(2)));
+    } else if(!isPeak&&stationRate?.flat&&form.kwh){
+      set("price_before_disc",String((+form.kwh*stationRate.flat).toFixed(2)));
+    }
+  },[form.kwh]);
+
+  const finalPrice=Math.max(0,(+form.price_before_disc||0)-(+form.discount||0));
+  const bahtPerKwh=+form.kwh>0?finalPrice/(+form.kwh):0;
+  const valid=form.date&&form.station&&+form.price_before_disc>0&&+form.kwh>0&&(!isPeak||form.peak_type);
+
+  const handleSave=()=>{
+    if(!valid)return;
+    // build snapshot
+    const snap=stationRate?{...stationRate,captured_at:new Date().toISOString()}:null;
+    onSave({
+      date:form.date, station:form.station, trip:form.trip||null,
+      peak_type:form.peak_type||null,
+      price_before_disc:+form.price_before_disc,
+      kwh:+form.kwh, discount:+form.discount||0,
+      rate_snapshot:snap,
+    });
+  };
+
+  return(
+    <div className="scrim" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-hd">
+          <h2>{entry?"แก้ไขรายการ":"เพิ่มรายการชาร์จ"}</h2>
+          <p>ราคาจะถูก snapshot ไว้อัตโนมัติ ณ วันที่บันทึก</p>
+        </div>
+        <div className="modal-body">
+          <div className="field">
+            <label>วันที่</label>
+            <input type="date" value={form.date} onChange={e=>set("date",e.target.value)}/>
+          </div>
+          <div className="field">
+            <label>สถานี</label>
+            <select value={form.station} onChange={e=>set("station",e.target.value)}>
+              {Object.keys(rates).map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Peak selector */}
+          {isPeak&&(
+            <div className="field full">
+              <label>ช่วงเวลา</label>
+              <div className="peak-selector">
+                <button type="button" className={"peak-btn "+(form.peak_type==="on_peak"?"on-sel":"")} onClick={()=>selectPeak("on_peak")}>
+                  <span className="pb-icon">🌞</span>
+                  <span className="pb-label">On Peak</span>
+                  <span className="pb-price">฿{NUM(stationRate.on_peak,2)}/kWh</span>
+                  <span className="pb-time">{stationRate.on_time||""}</span>
+                </button>
+                <button type="button" className={"peak-btn "+(form.peak_type==="off_peak"?"off-sel":"")} onClick={()=>selectPeak("off_peak")}>
+                  <span className="pb-icon">🌙</span>
+                  <span className="pb-label">Off Peak</span>
+                  <span className="pb-price">฿{NUM(stationRate.off_peak,2)}/kWh</span>
+                  <span className="pb-time">{stationRate.off_time||""}</span>
+                </button>
+              </div>
+              {!form.peak_type&&<span className="hint" style={{color:"#A85B5B"}}>⚠ กรุณาเลือกช่วงเวลา</span>}
+            </div>
+          )}
+
+          {/* Flat rate display */}
+          {!isPeak&&stationRate&&(
+            <div className="field full">
+              <label>ราคา</label>
+              <div className="rate-card">
+                <div><div className="rc-label">Flat Rate</div><div className="rc-unit">ราคาเดียวตลอด</div></div>
+                <div><div className="rc-price">฿{NUM(stationRate.flat,2)}</div><div className="rc-unit">ต่อ kWh</div></div>
+              </div>
+            </div>
+          )}
+
+          <div className="field full">
+            <label>ทริป (ไม่บังคับ)</label>
+            <input value={form.trip} onChange={e=>set("trip",e.target.value)} placeholder="เช่น เชียงใหม่, หัวหิน…"/>
+          </div>
+          <div className="field">
+            <label>พลังงาน (kWh)</label>
+            <input type="number" step="0.01" min="0" value={form.kwh} onChange={e=>set("kwh",e.target.value)} placeholder="0.00"/>
+          </div>
+          <div className="field">
+            <label>ส่วนลด (฿)</label>
+            <input type="number" step="0.01" min="0" value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0.00"/>
+            <span className="hint">โปรโมชั่น / สมาชิก</span>
+          </div>
+          <div className="field">
+            <label>ราคาก่อนลด (฿)</label>
+            <input type="number" step="0.01" min="0" value={form.price_before_disc} onChange={e=>set("price_before_disc",e.target.value)} placeholder="คำนวณอัตโนมัติ"/>
+            <span className="hint">kWh × ราคา — แก้ได้ถ้าไม่ตรง</span>
+          </div>
+          <div className="field computed">
+            <label>ชำระจริง</label>
+            <input value={THB(finalPrice)} readOnly/>
+            <span className="hint">{NUM(bahtPerKwh,2)} ฿/kWh</span>
+          </div>
+
+          {/* snapshot preview */}
+          {stationRate&&(
+            <div className="full">
+              <div className="snap-info">
+                <span className="sdot"/>
+                <span>Snapshot: {isPeak?`On ฿${NUM(stationRate.on_peak,2)} / Off ฿${NUM(stationRate.off_peak,2)}`:`฿${NUM(stationRate.flat,2)}/kWh`} — จะบันทึกไว้พร้อมรายการนี้</span>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="modal-ft">
+          <div className="fleft">{valid?`${NUM(+form.kwh,2)} kWh · ฿${NUM(+form.price_before_disc,2)} − ฿${NUM(+form.discount||0,2)}`:"กรอกข้อมูลเพื่อคำนวณ"}</div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost" onClick={onClose} disabled={saving}>ยกเลิก</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={!valid||saving} style={{opacity:valid&&!saving?1:.5}}>
+              {saving?"กำลังบันทึก…":(entry?"บันทึก":"เพิ่ม")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Admin Panel ─────────────────────────────────────────────────
+function AdminPanel({rates,setRates,api}){
+  const [local,setLocal]=useState(()=>JSON.parse(JSON.stringify(rates)));
+  const [saving,setSaving]=useState(false);
+  const [saved,setSaved]=useState(false);
+
+  const setField=(station,field,val)=>{
+    setLocal(r=>({...r,[station]:{...r[station],[field]:field==="on_peak"||field==="off_peak"||field==="flat"?+val||0:val}}));
+  };
+
+  const saveAll=async()=>{
+    setSaving(true);
+    try{
+      if(api){
+        for(const [station,data] of Object.entries(local)){
+          await api.upsertRate(station,{
+            rate_type:data.type,
+            on_peak:data.on_peak||null, off_peak:data.off_peak||null,
+            on_time:data.on_time||null, off_time:data.off_time||null,
+            flat:data.flat||null,
+          });
+        }
+      }
+      saveRates(local); setRates(local);
+      setSaved(true); setTimeout(()=>setSaved(false),2000);
+    }catch(e){ alert("บันทึกไม่ได้: "+e.message); }
+    setSaving(false);
+  };
+
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:12,flexWrap:"wrap"}}>
+        <div>
+          <h2 style={{margin:"0 0 4px",fontSize:17,fontWeight:600}}>ราคาสถานีชาร์จ</h2>
+          <p style={{margin:0,fontSize:13,color:"var(--ink-3)"}}>แก้ไขราคาที่นี่ — ระบบจะ snapshot ราคา ณ เวลาที่บันทึกรายการชาร์จแต่ละครั้ง</p>
+        </div>
+        <button className="btn btn-primary" onClick={saveAll} disabled={saving}>
+          {saving?"กำลังบันทึก…":saved?"✓ บันทึกแล้ว":"บันทึกราคา"}
+        </button>
+      </div>
+      <div className="admin-grid">
+        {Object.entries(local).map(([station,data])=>{
+          const s=smeta(station,rates);
+          return(
+            <div className="rate-row" key={station}>
+              <div className="rr-name">
+                <div className="rr-sname">
+                  <span style={{width:26,height:26,borderRadius:7,background:s.color,display:"inline-grid",placeItems:"center",fontSize:10,fontWeight:700,color:"#fff",flexShrink:0}}>{s.abbr}</span>
+                  {station}
+                  <span style={{fontSize:11,background:data.type==="peak"?"#FFF3CD":"var(--mint)",color:data.type==="peak"?"#9A6400":"var(--leaf-deep)",padding:"2px 8px",borderRadius:999,fontWeight:500}}>
+                    {data.type==="peak"?"On/Off Peak":"Flat Rate"}
+                  </span>
+                </div>
+              </div>
+              {data.type==="peak"?(
+                <div className="rate-inputs">
+                  <div className="rate-input-group">
+                    <label>🌞 On Peak (฿/kWh)</label>
+                    <input type="number" step="0.01" value={data.on_peak||""} onChange={e=>setField(station,"on_peak",e.target.value)}/>
+                  </div>
+                  <div className="rate-input-group">
+                    <label>On Peak เวลา</label>
+                    <input type="text" value={data.on_time||""} onChange={e=>setField(station,"on_time",e.target.value)} placeholder="09:00–22:00" style={{fontFamily:"inherit"}}/>
+                  </div>
+                  <div className="rate-input-group">
+                    <label>🌙 Off Peak (฿/kWh)</label>
+                    <input type="number" step="0.01" value={data.off_peak||""} onChange={e=>setField(station,"off_peak",e.target.value)}/>
+                  </div>
+                  <div className="rate-input-group">
+                    <label>Off Peak เวลา</label>
+                    <input type="text" value={data.off_time||""} onChange={e=>setField(station,"off_time",e.target.value)} placeholder="22:00–09:00" style={{fontFamily:"inherit"}}/>
+                  </div>
+                </div>
+              ):(
+                <div className="rate-inputs">
+                  <div className="rate-input-group">
+                    <label>ราคา (฿/kWh)</label>
+                    <input type="number" step="0.01" value={data.flat||""} onChange={e=>setField(station,"flat",e.target.value)}/>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Confirm ─────────────────────────────────────────────────────
+function ConfirmDel({entry,rates,onCancel,onConfirm,saving}){
+  const s=smeta(entry.station,rates);
+  return(
+    <div className="scrim" onClick={onCancel}>
+      <div className="confirm-box" onClick={e=>e.stopPropagation()}>
+        <h3>ลบรายการนี้?</h3>
+        <p>{dLbl(entry.date)} · {s.abbr} {entry.station}{entry.trip?` · ✈ ${entry.trip}`:""}<br/>
+          {NUM(entry.kwh,2)} kWh · {THB(entry.final_price)}<br/><br/>การลบไม่สามารถยกเลิกได้
+        </p>
+        <div className="ca">
+          <button className="btn btn-ghost" onClick={onCancel} disabled={saving}>ยกเลิก</button>
+          <button className="btn btn-danger" onClick={onConfirm} disabled={saving}>{saving?"กำลังลบ…":"ลบ"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── App ─────────────────────────────────────────────────────────
+function App(){
+  const [cfg,setCfg]         = useState(loadCfg);
+  const [rates,setRates]     = useState(loadRates);
+  const [entries,setEntries] = useState([]);
+  const [status,setStatus]   = useState("idle");
+  const [errMsg,setErrMsg]   = useState("");
+  const [tab,setTab]         = useState("รายการ"); // รายการ | Admin | Setup
+  const [modal,setModal]     = useState(null);
+  const [confirmDel,setDel]  = useState(null);
+  const [saving,setSaving]   = useState(false);
+  const [toast,setToast]     = useState("");
+  const [mf,setMf]           = useState(null);
+
+  const api = useMemo(()=>cfg.url&&cfg.key?makeApi(cfg.url,cfg.key):null,[cfg.url,cfg.key]);
+  const hasCfg = !!(cfg.url&&cfg.key);
+  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),1800);};
+
+  const load=useCallback(async()=>{
+    if(!api) return;
+    setStatus("loading"); setErrMsg("");
+    try{
+      const [data,rData]=await Promise.all([api.fetchAll(), api.fetchRates()]);
+      setEntries(data);
+      // merge DB rates over defaults
+      if(rData&&rData.length){
+        const merged={...loadRates()};
+        rData.forEach(r=>{ if(merged[r.station]){ merged[r.station]={...merged[r.station],type:r.rate_type,on_peak:r.on_peak,off_peak:r.off_peak,on_time:r.on_time,off_time:r.off_time,flat:r.flat}; }});
+        setRates(merged); saveRates(merged);
+      }
+      setStatus("ok");
+    }catch(e){setErrMsg(e.message);setStatus("err");}
+  },[api]);
+
+  useEffect(()=>{if(api) load();},[load]);
+
+  const handleSetup=(url,key)=>{ const c={url,key}; saveCfg(c); setCfg(c); setTab("รายการ"); };
+
+  const onSave=async(form)=>{
+    setSaving(true);
+    try{
+      if(modal?.id){
+        const u=await api.update(modal.id,form);
+        setEntries(es=>es.map(e=>e.id===modal.id?u:e)); showToast("บันทึกการแก้ไขแล้ว");
+      } else {
+        const c=await api.insert(form);
+        setEntries(es=>[c,...es].sort((a,b)=>b.date.localeCompare(a.date))); showToast("เพิ่มรายการแล้ว");
+      }
+      setModal(null);
+    }catch(e){setErrMsg(e.message);setStatus("err");}
+    setSaving(false);
+  };
+
+  const onDelConfirm=async()=>{
+    setSaving(true);
+    try{
+      await api.remove(confirmDel.id);
+      setEntries(es=>es.filter(e=>e.id!==confirmDel.id)); setDel(null); showToast("ลบรายการแล้ว");
+    }catch(e){setErrMsg(e.message);}
+    setSaving(false);
+  };
+
+  const onExport=()=>{
+    const rows=[
+      ["date","station","peak_type","trip","kwh","price_before_disc","discount","final_price","baht_per_kwh","rate_snapshot"],
+      ...entries.map(e=>[e.date,e.station,e.peak_type||"",e.trip||"",e.kwh,e.price_before_disc,e.discount,e.final_price,Number(e.baht_per_kwh).toFixed(4),JSON.stringify(e.rate_snapshot||{})])
+    ];
+    const csv="\uFEFF"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+    a.download=`ev-log-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    showToast("ส่งออก CSV แล้ว");
+  };
+
+  return(
+    <div className="app">
+      {/* Top bar */}
+      <div className="topbar">
+        <div className="brand">
+          <div className="logo">{I.bolt}</div>
+          <div><h1>EV Charging Log</h1><div className="sub">บันทึกการชาร์จรถไฟฟ้า · Toyota bZ4X</div></div>
+        </div>
+        <div className="topbar-right">
+          {hasCfg&&(
+            <>
+              {status==="loading"&&<span className="status-badge st-load"><span className="dot"/>กำลังโหลด</span>}
+              {status==="ok"&&<span className="status-badge st-ok"><span className="dot"/>Supabase · {entries.length} รายการ</span>}
+              {status==="err"&&<span className="status-badge st-err"><span className="dot"/>เชื่อมต่อไม่ได้</span>}
+              <button className="btn btn-ghost" onClick={load} title="โหลดใหม่">{I.rf}</button>
+            </>
+          )}
+          <div className="tab-bar">
+            {["รายการ","Admin","Setup"].map(t=>(
+              <button key={t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{t}</button>
+            ))}
+          </div>
+          {hasCfg&&tab==="รายการ"&&(
+            <>
+              <button className="btn btn-ghost" onClick={onExport}>{I.dl} ส่งออก</button>
+              <button className="btn btn-primary" onClick={()=>setModal("new")}>{I.plus} เพิ่มรายการ</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Error bar */}
+      {errMsg&&<div className="err-bar"><span>⚠️ {errMsg}</span><button onClick={()=>setErrMsg("")}>×</button></div>}
+
+      {/* Setup tab */}
+      {tab==="Setup"&&<SetupPanel onSave={handleSetup}/>}
+
+      {/* Admin tab */}
+      {tab==="Admin"&&<AdminPanel rates={rates} setRates={setRates} api={api}/>}
+
+      {/* Main view */}
+      {tab==="รายการ"&&(
+        <>
+          {hasCfg&&entries.length>0&&(
+            <>
+              <StatCards entries={entries}/>
+              <div className="panels">
+                <ChartPanel entries={entries} monthFilter={mf} setMonthFilter={setMf}/>
+                <BreakdownPanel entries={entries} rates={rates}/>
+              </div>
+            </>
+          )}
+          {hasCfg&&(
+            <LogTable entries={entries} rates={rates} onEdit={e=>setModal(e)} onDelete={e=>setDel(e)} monthFilter={mf} setMonthFilter={setMf} loading={status==="loading"}/>
+          )}
+          {!hasCfg&&<SetupPanel onSave={handleSetup}/>}
+        </>
+      )}
+
+      {/* Modals */}
+      {modal&&(
+        <EntryModal entry={modal==="new"?null:modal} rates={rates} onClose={()=>setModal(null)} onSave={onSave} saving={saving}/>
+      )}
+      {confirmDel&&(
+        <ConfirmDel entry={confirmDel} rates={rates} onCancel={()=>setDel(null)} onConfirm={onDelConfirm} saving={saving}/>
+      )}
+      {toast&&<div className="toast">✓ {toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
