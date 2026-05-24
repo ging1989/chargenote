@@ -9,22 +9,26 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F2F8F1;--bg-2:#EAF3E8;--surface:#fff;--surface-soft:#F7FBF6;
+  --bg:#F2F8F1;--bg-2:#EAF3E8;--surface:#FFFFFF;--surface-soft:#F7FBF6;
   --mint:#D9EFD2;--mint-2:#C5E5BD;--sage:#A8D5A0;--leaf:#7BBE74;
   --leaf-2:#4F9F52;--leaf-deep:#2E7D32;--ink:#1B3A1F;--ink-2:#2F4E33;
   --ink-3:#5A6E5C;--muted:#8AA08C;--line:#E1ECDE;--line-2:#D0E1CC;
   --warn:#E8A33A;--danger:#D27676;
+  --radius:14px;--radius-sm:10px;
   --shadow-sm:0 1px 0 rgba(40,80,40,.04),0 1px 2px rgba(40,80,40,.04);
   --shadow:0 1px 0 rgba(255,255,255,.6) inset,0 8px 24px -12px rgba(46,125,50,.18),0 2px 6px -2px rgba(46,125,50,.10);
-  --font:"Noto Sans Thai","IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --font-th:"Noto Sans Thai","IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}
-body{min-height:100vh;background:radial-gradient(1200px 600px at 90% -10%,#DFF0DA,transparent 55%),radial-gradient(900px 500px at -10% 110%,#E6F2E1,transparent 60%),var(--bg)}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-th);font-feature-settings:"ss01","cv11";-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:
+    radial-gradient(1200px 600px at 90% -10%,#DFF0DA 0%,transparent 55%),
+    radial-gradient(900px 500px at -10% 110%,#E6F2E1 0%,transparent 60%),
+    var(--bg)}
 .app{max-width:1280px;margin:0 auto;padding:28px 32px 80px}
 
-/* topbar */
+/* ── Top bar ── */
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:14px}
 .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#A8D5A0,#7BBE74);display:grid;place-items:center;box-shadow:var(--shadow);position:relative;overflow:hidden;flex-shrink:0}
@@ -32,26 +36,28 @@ body{min-height:100vh;background:radial-gradient(1200px 600px at 90% -10%,#DFF0D
 .logo svg{position:relative;z-index:1}
 .brand h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
 .brand .sub{font-size:12px;color:var(--ink-3);margin-top:2px}
-.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
-/* nav tabs */
-.tab-bar{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow-sm)}
-.tab-bar button{appearance:none;border:0;background:transparent;font-family:inherit;font-size:13px;color:var(--ink-2);padding:7px 14px;border-radius:999px;cursor:pointer;font-weight:500}
-.tab-bar button.on{background:var(--mint);color:var(--ink);box-shadow:0 1px 0 rgba(255,255,255,.7) inset}
-.tab-bar button:hover:not(.on){background:var(--surface-soft)}
+/* ── Nav ── */
+.nav{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow-sm)}
+.nav button{appearance:none;border:0;background:transparent;font-family:inherit;font-size:13px;color:var(--ink-2);padding:7px 14px;border-radius:999px;cursor:pointer;font-weight:500}
+.nav button.on{background:var(--mint);color:var(--ink);box-shadow:0 1px 0 rgba(255,255,255,.7) inset}
+.nav button:hover:not(.on){background:var(--surface-soft)}
 
-/* buttons */
-.btn{appearance:none;border:0;font-family:inherit;font-size:13px;font-weight:500;padding:9px 14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform .06s}
+/* ── Buttons ── */
+.btn{appearance:none;border:0;font-family:inherit;font-size:13px;font-weight:500;padding:9px 14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform .06s ease}
 .btn:active{transform:translateY(1px)}
 .btn-ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
 .btn-ghost:hover{background:var(--surface)}
 .btn-primary{background:var(--leaf-2);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 6px 14px -6px rgba(79,159,82,.55)}
 .btn-primary:hover{background:#458F47}
 .btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-soft{background:var(--mint);color:var(--ink)}
+.btn-soft:hover{background:var(--mint-2)}
 .btn-danger{background:var(--danger);color:#fff;border:0}
 .btn-danger:hover{background:#BF5E5E}
 
-/* status */
+/* ── Status ── */
 .status-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;border-radius:999px;padding:5px 12px;font-weight:500}
 .status-badge .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .st-ok{background:var(--mint);color:var(--leaf-deep)}.st-ok .dot{background:var(--leaf-2)}
@@ -59,94 +65,104 @@ body{min-height:100vh;background:radial-gradient(1200px 600px at 90% -10%,#DFF0D
 .st-load{background:var(--surface-soft);color:var(--ink-3);border:1px solid var(--line)}.st-load .dot{background:var(--muted);animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* setup */
-.setup-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 32px;margin-bottom:24px;box-shadow:var(--shadow-sm)}
+/* ── Setup ── */
+.setup-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px 32px;margin-bottom:24px;box-shadow:var(--shadow-sm)}
 .setup-card h2{margin:0 0 6px;font-size:17px;font-weight:600}
 .setup-card p{margin:0 0 20px;font-size:13px;color:var(--ink-3);line-height:1.7}
 .setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label{font-size:12px;color:var(--ink-2);font-weight:500}
-.field input,.field select,.field textarea{appearance:none;font-family:inherit;font-size:14px;color:var(--ink);background:var(--surface-soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;transition:border-color .12s,background .12s}
+.field input,.field select,.field textarea{appearance:none;font-family:inherit;font-size:14px;color:var(--ink);background:var(--surface-soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;outline:none;transition:border-color .12s,background .12s}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--sage);background:#fff;box-shadow:0 0 0 3px rgba(168,213,160,.3)}
 .field .hint{font-size:11px;color:var(--muted)}
 .field.computed input{background:var(--mint);color:var(--ink);font-weight:600;border-color:var(--mint-2)}
 .field input[readonly]{background:var(--surface-soft);color:var(--ink-3);cursor:default}
-.sql-block{background:#1B3A1F;color:#A8D5A0;font-family:var(--mono);font-size:12px;line-height:1.8;padding:16px 20px;border-radius:10px;overflow-x:auto;margin:16px 0 0;white-space:pre}
+.sql-block{background:#1B3A1F;color:#A8D5A0;font-family:var(--font-mono);font-size:12px;line-height:1.8;padding:16px 20px;border-radius:var(--radius-sm);overflow-x:auto;margin:16px 0 0;white-space:pre}
 .collapse-btn{appearance:none;border:0;background:transparent;font-family:inherit;font-size:12px;color:var(--leaf-2);cursor:pointer;padding:0;margin-top:14px;display:inline-flex;align-items:center;gap:4px;font-weight:500}
 .collapse-btn:hover{text-decoration:underline}
 
-/* stats */
+/* ── Stats ── */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
-.stat .lbl{font-size:12px;color:var(--ink-3)}
-.stat .val{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:8px;font-variant-numeric:tabular-nums}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+.stat .lbl{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.stat .val{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:8px;font-family:var(--font-th);font-variant-numeric:tabular-nums}
 .stat .val small{font-size:14px;color:var(--ink-3);font-weight:500;margin-left:4px}
 .stat .delta{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--leaf-2);background:var(--mint);padding:3px 8px;border-radius:999px;margin-top:8px;font-weight:500}
 .stat .delta.down{color:#A85B5B;background:#F4DEDE}
-.stat .accent{position:absolute;right:-20px;top:-20px;width:90px;height:90px;border-radius:50%;background:radial-gradient(circle,var(--mint),transparent 70%);opacity:.7}
+.stat .accent{position:absolute;right:-20px;top:-20px;width:90px;height:90px;border-radius:50%;background:radial-gradient(circle,var(--mint) 0%,transparent 70%);opacity:.7}
 
-/* panels */
+/* ── Panels ── */
 .panels{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:18px}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow-sm)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm)}
 .panel-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .panel h3{margin:0 0 4px;font-size:14px;font-weight:600}
-.panel .psub{font-size:12px;color:var(--ink-3)}
+.panel .panel-sub{font-size:12px;color:var(--ink-3)}
 .chip-group{display:flex;gap:4px;background:var(--surface-soft);border:1px solid var(--line);border-radius:10px;padding:3px}
 .chip-group button{appearance:none;border:0;background:transparent;font-family:inherit;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer;color:var(--ink-3);font-weight:500}
 .chip-group button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
-.chip-group.sm button{font-size:11px;padding:4px 8px}
-.chart{height:200px;display:flex;align-items:stretch;gap:10px;padding-top:10px;border-bottom:1px dashed var(--line-2);padding-bottom:24px}
-.bar-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;position:relative;transition:opacity .15s;cursor:pointer}
+.chip-group.small{padding:2px}
+.chip-group.small button{font-size:11px;padding:4px 8px}
+
+/* ── Chart ── */
+.chart{height:200px;display:flex;align-items:stretch;gap:10px;padding-top:10px;border-bottom:1px dashed var(--line-2);padding-bottom:24px;position:relative}
+.bar-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;position:relative;transition:opacity .15s}
+.bar-wrap.clickable{cursor:pointer}
 .bar-wrap.dim{opacity:.35}
-.bar-wrap.active .bseg{background:var(--leaf-2)!important;box-shadow:0 0 0 2px rgba(79,159,82,.18)}
-.bar-wrap.active .blbl{color:var(--ink);font-weight:600}
-.bar-wrap.active .bamt{opacity:1}
-.bstack{width:100%;border-radius:8px 8px 4px 4px;overflow:hidden;transition:transform .15s;min-height:4px;flex-shrink:0}
-.bar-wrap:hover .bstack{transform:translateY(-2px)}
-.bseg{width:100%;height:100%;background:var(--sage);display:block;transition:background .12s}
-.bar-wrap:hover .bseg{background:var(--leaf)!important}
-.blbl{font-size:11px;color:var(--ink-3);font-weight:500;position:absolute;bottom:-22px;left:0;right:0;text-align:center}
-.bamt{font-size:10px;color:var(--ink-2);font-variant-numeric:tabular-nums;opacity:0;transition:opacity .15s;font-weight:500}
-.bar-wrap:hover .bamt{opacity:1}
-.chart-foot{margin-top:18px;font-size:12px;color:var(--ink-3);min-height:20px;display:flex;align-items:center}
+.bar-wrap.active .bar-seg.solid{background:var(--leaf-2);box-shadow:0 0 0 2px rgba(79,159,82,.18)}
+.bar-wrap.active .bar-label{color:var(--ink);font-weight:600}
+.bar-wrap.active .bar-amount{opacity:1}
+.bar-stack{width:100%;display:flex;flex-direction:column-reverse;border-radius:8px 8px 4px 4px;overflow:hidden;transition:transform .15s ease;min-height:4px;flex-shrink:0}
+.bar-wrap.clickable:hover .bar-stack{transform:translateY(-2px)}
+.bar-seg{width:100%;min-height:0;flex:1}
+.bar-seg.solid{background:var(--sage);transition:background .12s}
+.bar-wrap.clickable:hover .bar-seg.solid{background:var(--leaf)}
+.bar-label{font-size:11px;color:var(--ink-3);font-weight:500;position:absolute;bottom:-22px;left:0;right:0;text-align:center}
+.bar-amount{font-size:10px;color:var(--ink-2);font-variant-numeric:tabular-nums;opacity:0;transition:opacity .15s;font-weight:500}
+.bar-wrap.clickable:hover .bar-amount{opacity:1}
+.chart-footer{margin-top:18px;font-size:12px;color:var(--ink-3);min-height:20px;display:flex;align-items:center}
+.chart-footer .hint-line{opacity:.7}
 .link-btn{appearance:none;border:0;background:transparent;font-family:inherit;font-size:12px;color:var(--leaf-2);cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px}
 .link-btn b{font-weight:600;color:var(--ink)}
 .link-btn:hover{text-decoration:underline}
-.bd-list{display:flex;flex-direction:column;gap:12px}
-.bd-row{display:flex;align-items:center;gap:12px}
-.bd-dot{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:600;font-size:12px;flex-shrink:0}
-.bd-info{flex:1;min-width:0}
-.bd-name{font-size:13px;font-weight:500}
-.bd-meta{font-size:11px;color:var(--ink-3);margin-top:1px}
-.bd-bar{height:4px;background:var(--bg-2);border-radius:2px;margin-top:6px;overflow:hidden}
-.bd-bar i{display:block;height:100%;border-radius:2px}
-.bd-amt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
-.bd-pct{font-size:11px;color:var(--ink-3);text-align:right;margin-top:1px}
 
-/* table */
-.table-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);overflow:hidden}
-.table-top{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
-.table-top h3{margin:0;font-size:14px;font-weight:600}
-.table-top .tsub{font-size:12px;color:var(--ink-3);margin-top:2px}
+/* ── Breakdown ── */
+.breakdown-list{display:flex;flex-direction:column;gap:12px}
+.bd-row{display:flex;align-items:center;gap:12px}
+.bd-row .dot{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:600;font-size:12px;flex-shrink:0}
+.bd-row .info{flex:1;min-width:0}
+.bd-row .name{font-size:13px;font-weight:500;color:var(--ink)}
+.bd-row .meta{font-size:11px;color:var(--ink-3);margin-top:1px}
+.bd-row .amt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.bd-row .pct{font-size:11px;color:var(--ink-3);text-align:right;margin-top:1px}
+.bd-bar{position:relative;height:4px;background:var(--bg-2);border-radius:2px;margin-top:6px;overflow:hidden}
+.bd-bar > i{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
+
+/* ── Table ── */
+.table-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
+.table-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
+.table-head h3{margin:0;font-size:14px;font-weight:600}
+.table-head .sub{font-size:12px;color:var(--ink-3);margin-top:2px}
 .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.search-box{display:flex;align-items:center;gap:8px;background:var(--surface-soft);border:1px solid var(--line);border-radius:10px;padding:7px 12px;width:220px}
-.search-box input{border:0;background:transparent;outline:none;font-family:inherit;font-size:13px;color:var(--ink);width:100%}
-.search-box input::placeholder{color:var(--muted)}
-.mpill{display:inline-flex;align-items:center;gap:6px;background:var(--mint);color:var(--ink);padding:2px 4px 2px 10px;border-radius:999px;font-size:11px;font-weight:500;margin-left:8px}
-.mpill button{appearance:none;border:0;background:rgba(0,0,0,.08);color:var(--ink);width:16px;height:16px;border-radius:50%;cursor:pointer;font-size:12px;display:grid;place-items:center;padding:0}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface-soft);border:1px solid var(--line);border-radius:10px;padding:7px 12px;width:220px}
+.search input{border:0;background:transparent;outline:none;font-family:inherit;font-size:13px;color:var(--ink);width:100%}
+.search input::placeholder{color:var(--muted)}
+.month-pill{display:inline-flex;align-items:center;gap:6px;background:var(--mint);color:var(--ink);padding:2px 4px 2px 10px;border-radius:999px;font-size:11px;font-weight:500;margin-left:8px}
+.month-pill button{appearance:none;border:0;background:rgba(0,0,0,.08);color:var(--ink);width:16px;height:16px;border-radius:50%;cursor:pointer;font-size:12px;display:grid;place-items:center;padding:0}
+.month-pill button:hover{background:rgba(0,0,0,.18)}
 .twrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
 thead th{text-align:left;font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:12px 16px;background:var(--surface-soft);border-bottom:1px solid var(--line);user-select:none;cursor:pointer;white-space:nowrap}
 thead th:hover{color:var(--ink)}
-.si{margin-left:4px;opacity:.5;font-size:9px}
-thead th.sorted .si{opacity:1;color:var(--leaf-2)}
+.sort-ind{margin-left:4px;opacity:.5;font-size:9px}
+thead th.sorted .sort-ind{opacity:1;color:var(--leaf-2)}
 thead th.num,tbody td.num{text-align:right}
 tbody tr{border-bottom:1px solid var(--line);transition:background .12s}
 tbody tr:last-child{border-bottom:0}
 tbody tr:hover{background:var(--surface-soft)}
 tbody td{padding:12px 16px;color:var(--ink-2);font-variant-numeric:tabular-nums}
-.date-cell{color:var(--ink)!important;font-weight:500;white-space:nowrap}
-.st-cell{display:flex;align-items:center;gap:10px}
+tbody td.date{color:var(--ink);font-weight:500;white-space:nowrap}
+tbody td.station{color:var(--ink);font-weight:500}
+.station-cell{display:flex;align-items:center;gap:10px}
 .badge{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0}
 .peak-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600}
 .peak-on{background:#FFF3CD;color:#9A6400}
@@ -160,7 +176,7 @@ tbody td{padding:12px 16px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .spinner{width:28px;height:28px;border:2.5px solid var(--line);border-top-color:var(--leaf-2);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* modal */
+/* ── Modal ── */
 .scrim{position:fixed;inset:0;background:rgba(27,58,31,.32);backdrop-filter:blur(6px);z-index:50;display:grid;place-items:center;padding:24px;animation:fadeIn .15s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .modal{background:var(--surface);border-radius:18px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px -20px rgba(27,58,31,.4);animation:popIn .2s ease}
@@ -171,9 +187,9 @@ tbody td{padding:12px 16px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .modal-body{padding:20px 24px 8px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .modal-body .full{grid-column:1/-1}
 .modal-ft{display:flex;justify-content:space-between;align-items:center;padding:16px 24px 20px;border-top:1px solid var(--line);background:var(--surface-soft);position:sticky;bottom:0}
-.modal-ft .fleft{font-size:12px;color:var(--ink-3)}
+.modal-ft .left{font-size:12px;color:var(--ink-3)}
 
-/* peak selector */
+/* ── Peak selector ── */
 .peak-selector{display:flex;gap:8px}
 .peak-btn{flex:1;appearance:none;border:2px solid var(--line);border-radius:12px;background:var(--surface-soft);font-family:inherit;cursor:pointer;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .12s}
 .peak-btn:hover{border-color:var(--sage)}
@@ -184,31 +200,31 @@ tbody td{padding:12px 16px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .peak-btn .pb-price{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2)}
 .peak-btn .pb-time{font-size:10px;color:var(--muted);margin-top:1px}
 
-/* rate card (flat) */
+/* ── Rate card ── */
 .rate-card{background:var(--mint);border:1px solid var(--mint-2);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
 .rate-card .rc-label{font-size:12px;color:var(--ink-3);font-weight:500}
 .rate-card .rc-price{font-size:18px;font-weight:700;color:var(--leaf-deep);font-variant-numeric:tabular-nums}
 .rate-card .rc-unit{font-size:11px;color:var(--ink-3);margin-top:2px}
 
-/* snapshot badge */
+/* ── Snapshot ── */
 .snap-info{font-size:11px;color:var(--ink-3);display:flex;align-items:center;gap:6px;margin-top:6px}
 .snap-info .sdot{width:5px;height:5px;border-radius:50%;background:var(--leaf-2)}
 
-/* err bar */
+/* ── Error bar ── */
 .err-bar{background:#F4DEDE;border:1px solid var(--danger);border-radius:10px;padding:12px 16px;font-size:13px;color:#7A3030;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .err-bar button{appearance:none;border:0;background:transparent;cursor:pointer;color:#7A3030;font-size:16px}
 
-/* confirm */
+/* ── Confirm ── */
 .confirm-box{background:var(--surface);border-radius:16px;width:100%;max-width:360px;padding:24px;box-shadow:0 20px 60px -20px rgba(27,58,31,.4);animation:popIn .2s ease}
 .confirm-box h3{margin:0 0 8px;font-size:16px;font-weight:600}
 .confirm-box p{margin:0 0 20px;font-size:13px;color:var(--ink-3);line-height:1.65}
 .confirm-box .ca{display:flex;gap:8px;justify-content:flex-end}
 
-/* toast */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px -10px rgba(0,0,0,.4);z-index:60;white-space:nowrap;animation:toastIn .2s ease}
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px -10px rgba(0,0,0,.4);z-index:60;display:flex;align-items:center;gap:8px;white-space:nowrap;animation:toastIn .2s ease}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
 
-/* admin */
+/* ── Admin ── */
 .admin-grid{display:grid;gap:12px}
 .rate-row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-sm)}
 .rate-row .rr-name{flex:1}
@@ -217,14 +233,14 @@ tbody td{padding:12px 16px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .rate-inputs{display:flex;gap:10px;align-items:flex-end}
 .rate-input-group{display:flex;flex-direction:column;gap:4px}
 .rate-input-group label{font-size:11px;color:var(--ink-3);font-weight:500;white-space:nowrap}
-.rate-input-group input{width:90px;appearance:none;font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--surface-soft);border:1px solid var(--line);border-radius:8px;padding:7px 10px;outline:none;transition:border-color .12s}
+.rate-input-group input{width:90px;appearance:none;font-family:var(--font-mono);font-size:13px;color:var(--ink);background:var(--surface-soft);border:1px solid var(--line);border-radius:8px;padding:7px 10px;outline:none;transition:border-color .12s}
 .rate-input-group input:focus{border-color:var(--sage);background:#fff;box-shadow:0 0 0 3px rgba(168,213,160,.3)}
 
 @media(max-width:900px){
   .stats{grid-template-columns:repeat(2,1fr)}
   .panels{grid-template-columns:1fr}
   .app{padding:16px 16px 80px}
-  .search-box{width:100%}
+  .search{width:100%}
   .setup-grid,.modal-body{grid-template-columns:1fr}
   .modal-body .full{grid-column:1}
   .rate-row{flex-direction:column;align-items:flex-start}
@@ -234,8 +250,8 @@ tbody td{padding:12px 16px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 </head>
 <body>
 <div id="root"></div>
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback, useRef } = React;
@@ -346,6 +362,9 @@ create table charging_sessions (
   created_at        timestamptz default now()
 );
 alter table charging_sessions enable row level security;
+-- ⚠️ policy นี้เปิดให้ทุกคนที่รู้ anon key เข้าถึงได้
+-- สำหรับใช้ส่วนตัว ควรเพิ่ม Supabase Auth และเปลี่ยนเป็น:
+--   using (auth.uid() = user_id) with check (auth.uid() = user_id)
 create policy "allow all" on charging_sessions
   for all using (true) with check (true);
 
@@ -461,8 +480,8 @@ function ChartPanel({entries,monthFilter,setMonthFilter}){
   return(
     <div className="panel">
       <div className="panel-hd">
-        <div><h3>ค่าใช้จ่ายรายเดือน</h3><div className="psub">{data.length} เดือน · {THB(totC)} · {NUM(totK,1)} kWh</div></div>
-        <div className="chip-group sm">
+        <div><h3>ค่าใช้จ่ายรายเดือน</h3><div className="panel-sub">{data.length} เดือน · {THB(totC)} · {NUM(totK,1)} kWh</div></div>
+        <div className="chip-group small">
           {[["3","3ด."],["6","6ด."],["12","12ด."],["all","ทั้งหมด"]].map(([v,l])=>(
             <button key={v} className={range===v?"on":""} onClick={()=>setRange(v)}>{l}</button>
           ))}
@@ -472,18 +491,18 @@ function ChartPanel({entries,monthFilter,setMonthFilter}){
         {data.map(d=>{
           const act=monthFilter===d.key, dim=monthFilter&&monthFilter!==d.key;
           return(
-            <div key={d.key} className={"bar-wrap "+(act?"active ":"")+(dim?"dim ":"")} onClick={()=>setMonthFilter(monthFilter===d.key?null:d.key)} title={`${mLbl(d.key)} · ${THB(d.cost)} · ${d.n}ครั้ง`}>
-              <div className="bamt">{THB(d.cost)}</div>
-              <div className="bstack" style={{height:(d.cost/max*100)+"%"}}><span className="bseg"/></div>
-              <div className="blbl">{mLbl(d.key)}</div>
+            <div key={d.key} className={"bar-wrap clickable "+(act?"active ":"")+(dim?"dim ":"")} onClick={()=>setMonthFilter(monthFilter===d.key?null:d.key)} title={`${mLbl(d.key)} · ${THB(d.cost)} · ${d.n}ครั้ง`}>
+              <div className="bar-amount">{THB(d.cost)}</div>
+              <div className="bar-stack" style={{height:(d.cost/max*100)+"%"}}><span className="bar-seg solid"/></div>
+              <div className="bar-label">{mLbl(d.key)}</div>
             </div>
           );
         })}
       </div>
-      <div className="chart-foot">
+      <div className="chart-footer">
         {monthFilter
           ?<button className="link-btn" onClick={()=>setMonthFilter(null)}>กำลังกรองเฉพาะ <b>{mLbl(monthFilter)}</b> · ยกเลิก</button>
-          :<span style={{opacity:.7}}>คลิกแท่งกราฟเพื่อกรองเดือนนั้น</span>}
+          :<span className="hint-line">คลิกแท่งกราฟเพื่อกรองเดือนนั้น</span>}
       </div>
     </div>
   );
@@ -503,19 +522,19 @@ function BreakdownPanel({entries,rates}){
   return(
     <div className="panel">
       <h3>สัดส่วนตามสถานี</h3>
-      <div className="psub" style={{marginBottom:14}}>ยอดรวมตลอดประวัติ</div>
-      <div className="bd-list">
+      <div className="panel-sub" style={{marginBottom:14}}>ยอดรวมตลอดประวัติ</div>
+      <div className="breakdown-list">
         {bd.map(b=>{
           const s=smeta(b.key,rates);
           return(
             <div className="bd-row" key={b.key}>
-              <div className="bd-dot" style={{background:s.color+"28",color:s.color}}>{s.abbr}</div>
-              <div className="bd-info">
-                <div className="bd-name">{b.key}</div>
-                <div className="bd-meta">{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
+              <div className="dot" style={{background:s.color+"28",color:s.color}}>{s.abbr}</div>
+              <div className="info">
+                <div className="name">{b.key}</div>
+                <div className="meta">{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
                 <div className="bd-bar"><i style={{width:b.pct+"%",background:s.color}}/></div>
               </div>
-              <div><div className="bd-amt">{THB(b.cost)}</div><div className="bd-pct">{b.pct.toFixed(1)}%</div></div>
+              <div><div className="amt">{THB(b.cost)}</div><div className="pct">{b.pct.toFixed(1)}%</div></div>
             </div>
           );
         })}
@@ -541,17 +560,17 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
   const setK=k=>setSort(s=>s.key===k?{key:k,dir:s.dir==="asc"?"desc":"asc"}:{key:k,dir:"desc"});
   const Hdr=({label,k,align="left"})=>(
     <th className={(sort.key===k?"sorted ":"")+(align==="right"?"num":"")} onClick={()=>setK(k)}>
-      {label}<span className="si">{sort.key===k?(sort.dir==="asc"?"▲":"▼"):"▲▼"}</span>
+      {label}<span className="sort-ind">{sort.key===k?(sort.dir==="asc"?"▲":"▼"):"▲▼"}</span>
     </th>
   );
   return(
     <div className="table-card">
-      <div className="table-top">
+      <div className="table-head">
         <div>
           <h3>รายการชาร์จ</h3>
-          <div className="tsub">
+          <div className="sub">
             {filtered.length} รายการ
-            {monthFilter&&<span className="mpill">{mLbl(monthFilter)} <button onClick={()=>setMonthFilter(null)}>×</button></span>}
+            {monthFilter&&<span className="month-pill">{mLbl(monthFilter)} <button onClick={()=>setMonthFilter(null)}>×</button></span>}
           </div>
         </div>
         <div className="filters">
@@ -560,7 +579,7 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
               <button key={f} className={filter===f?"on":""} onClick={()=>setFilter(f)}>{f}</button>
             ))}
           </div>
-          <div className="search-box">{I.search}<input placeholder="ค้นหาสถานี / ทริป…" value={q} onChange={e=>setQ(e.target.value)}/></div>
+          <div className="search">{I.search}<input placeholder="ค้นหาสถานี / ทริป…" value={q} onChange={e=>setQ(e.target.value)}/></div>
         </div>
       </div>
       {loading?<div className="empty"><div className="spinner"/><div style={{marginTop:12}}>กำลังโหลด…</div></div>
@@ -585,8 +604,8 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
                 const s=smeta(e.station,rates);
                 return(
                   <tr key={e.id}>
-                    <td className="date-cell">{dLbl(e.date)}</td>
-                    <td><div className="st-cell"><div className="badge" style={{background:s.color}}>{s.abbr}</div><div>{e.station}</div></div></td>
+                    <td className="date">{dLbl(e.date)}</td>
+                    <td className="station"><div className="station-cell"><div className="badge" style={{background:s.color}}>{s.abbr}</div><div>{e.station}</div></div></td>
                     <td>
                       {e.peak_type==="on_peak"&&<span className="peak-pill peak-on">🌞 On Peak</span>}
                       {e.peak_type==="off_peak"&&<span className="peak-pill peak-off">🌙 Off Peak</span>}
@@ -648,7 +667,7 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
     }
   };
 
-  // recalc price when kwh changes
+  // recalc price when kwh or station changes
   useEffect(()=>{
     if(form.peak_type&&stationRate&&form.kwh){
       const rate=form.peak_type==="on_peak"?stationRate.on_peak:stationRate.off_peak;
@@ -656,11 +675,12 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
     } else if(!isPeak&&stationRate?.flat&&form.kwh){
       set("price_before_disc",String((+form.kwh*stationRate.flat).toFixed(2)));
     }
-  },[form.kwh]);
+  },[form.kwh, form.station]);
 
   const finalPrice=Math.max(0,(+form.price_before_disc||0)-(+form.discount||0));
   const bahtPerKwh=+form.kwh>0?finalPrice/(+form.kwh):0;
-  const valid=form.date&&form.station&&+form.price_before_disc>0&&+form.kwh>0&&(!isPeak||form.peak_type);
+  const discountErr=+form.discount>0&&+form.discount>(+form.price_before_disc||0);
+  const valid=form.date&&form.station&&+form.price_before_disc>0&&+form.kwh>0&&(!isPeak||form.peak_type)&&!discountErr;
 
   const handleSave=()=>{
     if(!valid)return;
@@ -737,8 +757,8 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
           </div>
           <div className="field">
             <label>ส่วนลด (฿)</label>
-            <input type="number" step="0.01" min="0" value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0.00"/>
-            <span className="hint">โปรโมชั่น / สมาชิก</span>
+            <input type="number" step="0.01" min="0" value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0.00" style={discountErr?{borderColor:"var(--danger)"}:{}}/>
+            {discountErr?<span className="hint" style={{color:"#A85B5B"}}>⚠ ส่วนลดมากกว่าราคาก่อนลด</span>:<span className="hint">โปรโมชั่น / สมาชิก</span>}
           </div>
           <div className="field">
             <label>ราคาก่อนลด (฿)</label>
@@ -762,7 +782,7 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
           )}
         </div>
         <div className="modal-ft">
-          <div className="fleft">{valid?`${NUM(+form.kwh,2)} kWh · ฿${NUM(+form.price_before_disc,2)} − ฿${NUM(+form.discount||0,2)}`:"กรอกข้อมูลเพื่อคำนวณ"}</div>
+          <div className="left">{valid?`${NUM(+form.kwh,2)} kWh · ฿${NUM(+form.price_before_disc,2)} − ฿${NUM(+form.discount||0,2)}`:"กรอกข้อมูลเพื่อคำนวณ"}</div>
           <div style={{display:"flex",gap:8}}>
             <button className="btn btn-ghost" onClick={onClose} disabled={saving}>ยกเลิก</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={!valid||saving} style={{opacity:valid&&!saving?1:.5}}>
@@ -780,6 +800,10 @@ function AdminPanel({rates,setRates,api}){
   const [local,setLocal]=useState(()=>JSON.parse(JSON.stringify(rates)));
   const [saving,setSaving]=useState(false);
   const [saved,setSaved]=useState(false);
+  const [saveErr,setSaveErr]=useState("");
+  const isDirty=JSON.stringify(local)!==JSON.stringify(rates);
+
+  useEffect(()=>{ setLocal(JSON.parse(JSON.stringify(rates))); },[rates]);
 
   const setField=(station,field,val)=>{
     setLocal(r=>({...r,[station]:{...r[station],[field]:field==="on_peak"||field==="off_peak"||field==="flat"?+val||0:val}}));
@@ -799,9 +823,9 @@ function AdminPanel({rates,setRates,api}){
         }
       }
       saveRates(local); setRates(local);
-      setSaved(true); setTimeout(()=>setSaved(false),2000);
-    }catch(e){ alert("บันทึกไม่ได้: "+e.message); }
-    setSaving(false);
+      setSaved(true); setSaveErr(""); setTimeout(()=>setSaved(false),2000);
+    }catch(e){ setSaveErr("บันทึกไม่ได้: "+e.message); }
+    finally{ setSaving(false); }
   };
 
   return(
@@ -815,6 +839,8 @@ function AdminPanel({rates,setRates,api}){
           {saving?"กำลังบันทึก…":saved?"✓ บันทึกแล้ว":"บันทึกราคา"}
         </button>
       </div>
+      {isDirty&&<div style={{background:"#FFF3CD",border:"1px solid #E8A33A",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#9A6400"}}>⚠ มีการเปลี่ยนแปลงที่ยังไม่บันทึก</div>}
+      {saveErr&&<div className="err-bar" style={{marginBottom:14}}><span>⚠️ {saveErr}</span><button onClick={()=>setSaveErr("")}>×</button></div>}
       <div className="admin-grid">
         {Object.entries(local).map(([station,data])=>{
           const s=smeta(station,rates);
@@ -883,6 +909,23 @@ function ConfirmDel({entry,rates,onCancel,onConfirm,saving}){
   );
 }
 
+// ── Error Boundary ──────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state={err:null}; }
+  static getDerivedStateFromError(err){ return {err}; }
+  render(){
+    if(this.state.err) return(
+      <div style={{padding:60,textAlign:"center",color:"var(--ink-3)"}}>
+        <div style={{fontSize:36,marginBottom:12}}>⚠️</div>
+        <div style={{fontWeight:600,fontSize:16,marginBottom:8,color:"var(--ink)"}}>เกิดข้อผิดพลาดที่ไม่คาดคิด</div>
+        <div style={{fontSize:13,marginBottom:20}}>{this.state.err.message}</div>
+        <button className="btn btn-ghost" onClick={()=>this.setState({err:null})}>ลองใหม่</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 // ── App ─────────────────────────────────────────────────────────
 function App(){
   const [cfg,setCfg]         = useState(loadCfg);
@@ -933,7 +976,7 @@ function App(){
       }
       setModal(null);
     }catch(e){setErrMsg(e.message);setStatus("err");}
-    setSaving(false);
+    finally{setSaving(false);}
   };
 
   const onDelConfirm=async()=>{
@@ -942,7 +985,7 @@ function App(){
       await api.remove(confirmDel.id);
       setEntries(es=>es.filter(e=>e.id!==confirmDel.id)); setDel(null); showToast("ลบรายการแล้ว");
     }catch(e){setErrMsg(e.message);}
-    setSaving(false);
+    finally{setSaving(false);}
   };
 
   const onExport=()=>{
@@ -950,12 +993,13 @@ function App(){
       ["date","station","peak_type","trip","kwh","price_before_disc","discount","final_price","baht_per_kwh","rate_snapshot"],
       ...entries.map(e=>[e.date,e.station,e.peak_type||"",e.trip||"",e.kwh,e.price_before_disc,e.discount,e.final_price,Number(e.baht_per_kwh).toFixed(4),JSON.stringify(e.rate_snapshot||{})])
     ];
-    const csv="\uFEFF"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const escCsv=c=>{ const s=String(c).replace(/"/g,'""'); return /^[=+\-@\t\r]/.test(s)?`"'${s}"`:`"${s}"`; };
+    const csv="\uFEFF"+rows.map(r=>r.map(escCsv).join(",")).join("\n");
+    const blobUrl=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
     const a=document.createElement("a");
-    a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-    a.download=`ev-log-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    a.href=blobUrl; a.download=`ev-log-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(blobUrl);
     showToast("ส่งออก CSV แล้ว");
-  };
 
   return(
     <div className="app">
@@ -965,7 +1009,7 @@ function App(){
           <div className="logo">{I.bolt}</div>
           <div><h1>EV Charging Log</h1><div className="sub">บันทึกการชาร์จรถไฟฟ้า · Toyota bZ4X</div></div>
         </div>
-        <div className="topbar-right">
+        <div className="actions">
           {hasCfg&&(
             <>
               {status==="loading"&&<span className="status-badge st-load"><span className="dot"/>กำลังโหลด</span>}
@@ -974,7 +1018,7 @@ function App(){
               <button className="btn btn-ghost" onClick={load} title="โหลดใหม่">{I.rf}</button>
             </>
           )}
-          <div className="tab-bar">
+          <div className="nav">
             {["รายการ","Admin","Setup"].map(t=>(
               <button key={t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{t}</button>
             ))}
@@ -1028,7 +1072,7 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App/></ErrorBoundary>);
 </script>
 </body>
 </html>
