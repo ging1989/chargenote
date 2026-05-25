@@ -1556,24 +1556,27 @@ function App(){
           {/* ภาพรวม */}
           {tab==="สถิติ"&&(
             <>
-              <div className="stat-filter">
+              <div className="stat-filter" style={{flexDirection:"row",alignItems:"center",gap:8}}>
                 <select
-                  value={statYear===0?"all":statMonth===0?`${statYear}-0`:`${statYear}-${statMonth}`}
-                  onChange={e=>{
-                    const v=e.target.value;
-                    if(v==="all"){setStatYear(0);setStatMonth(0);}
-                    else{const[y,m]=v.split("-");setStatYear(+y);setStatMonth(+m);}
-                  }}
+                  value={statYear===0?"all":statYear}
+                  onChange={e=>{const v=e.target.value;setStatYear(v==="all"?0:+v);setStatMonth(0);}}
                   style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
                 >
-                  <option value="all">ทั้งหมด</option>
-                  {statYearOpts.map(({year,months})=>(
-                    <optgroup key={year} label={`── ${year} ──`}>
-                      <option value={`${year}-0`}>ทั้งปี {year}</option>
-                      {months.map(m=>(
-                        <option key={m} value={`${year}-${m}`}>{MONTHS[m-1]} {year}</option>
-                      ))}
-                    </optgroup>
+                  <option value="all">ทุกปี</option>
+                  {statYearOpts.map(({year})=>(
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+                <select
+                  value={statMonth===0?"all":statMonth}
+                  onChange={e=>{const v=e.target.value;setStatMonth(v==="all"?0:+v);}}
+                  style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
+                >
+                  <option value="all">ทุกเดือน</option>
+                  {(statYear===0?statYearOpts.flatMap(o=>o.months.map(m=>({year:o.year,m}))):
+                    (statYearOpts.find(o=>o.year===statYear)?.months||[]).map(m=>({year:statYear,m}))
+                  ).map(({year,m})=>(
+                    <option key={`${year}-${m}`} value={m}>{MONTHS[m-1]}</option>
                   ))}
                 </select>
               </div>
