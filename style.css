@@ -70,7 +70,7 @@ body{min-height:100vh;background:var(--bg)}
 .collapse-btn:hover{text-decoration:underline}
 
 /* ── Stat filter ── */
-.stat-filter{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.stat-filter{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;align-items:flex-end}
 .stat-filter .chip-group button:disabled{opacity:.3;cursor:not-allowed}
 
 /* ── Stats ── */

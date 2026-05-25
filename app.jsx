@@ -947,7 +947,7 @@ function App(){
 
   const statYears = useMemo(()=>[...new Set(entries.map(e=>+e.date.slice(0,4)))].sort((a,b)=>b-a),[entries]);
   const statMonthsInYear = useMemo(()=>new Set(entries.filter(e=>+e.date.slice(0,4)===statYear).map(e=>+e.date.slice(5,7))),[entries,statYear]);
-  const statsEntries = useMemo(()=>entries.filter(e=>+e.date.slice(0,4)===statYear&&+e.date.slice(5,7)===statMonth),[entries,statYear,statMonth]);
+  const statsEntries = useMemo(()=>statMonth===0?yearEntries:entries.filter(e=>+e.date.slice(0,4)===statYear&&+e.date.slice(5,7)===statMonth),[entries,statYear,statMonth,yearEntries]);
   const yearEntries  = useMemo(()=>entries.filter(e=>+e.date.slice(0,4)===statYear),[entries,statYear]);
   const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),1800);};
@@ -1067,6 +1067,7 @@ function App(){
               ))}
             </div>
             <div className="chip-group">
+              <button className={statMonth===0?"on":""} onClick={()=>setStatMonth(0)}>ทั้งหมด</button>
               {MONTHS.map((lbl,i)=>{
                 const m=i+1;
                 return <button key={m} className={statMonth===m?"on":""} disabled={!statMonthsInYear.has(m)} onClick={()=>setStatMonth(m)}>{lbl}</button>;
