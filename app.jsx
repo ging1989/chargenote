@@ -1418,10 +1418,10 @@ function App(){
   const statMonthsInYear = useMemo(()=>new Set(entries.filter(e=>+e.date.slice(0,4)===statYear).map(e=>+e.date.slice(5,7))),[entries,statYear]);
   const yearEntries  = useMemo(()=>statYear===0?entries:entries.filter(e=>+e.date.slice(0,4)===statYear),[entries,statYear]);
   const statsEntries = useMemo(()=>statYear===0||statMonth===0?yearEntries:entries.filter(e=>+e.date.slice(0,4)===statYear&&+e.date.slice(5,7)===statMonth),[entries,statYear,statMonth,yearEntries]);
-  const statMonthOpts = useMemo(()=>{
+  const statYearOpts = useMemo(()=>{
     const by={};
-    entries.forEach(e=>{const k=mKey(e.date);if(!by[k])by[k]=1;});
-    return Object.keys(by).sort().reverse();
+    entries.forEach(e=>{const y=+e.date.slice(0,4),m=+e.date.slice(5,7);if(!by[y])by[y]=new Set();by[y].add(m);});
+    return Object.entries(by).sort(([a],[b])=>+b-+a).map(([y,ms])=>({year:+y,months:[...ms].sort((a,b)=>b-a)}));
   },[entries]);
   const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),1800);};
@@ -1558,7 +1558,7 @@ function App(){
             <>
               <div className="stat-filter">
                 <select
-                  value={statYear===0?"all":`${statYear}-${String(statMonth).padStart(2,"0")}`}
+                  value={statYear===0?"all":statMonth===0?`${statYear}-0`:`${statYear}-${statMonth}`}
                   onChange={e=>{
                     const v=e.target.value;
                     if(v==="all"){setStatYear(0);setStatMonth(0);}
@@ -1567,10 +1567,14 @@ function App(){
                   style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
                 >
                   <option value="all">ทั้งหมด</option>
-                  {statMonthOpts.map(k=>{
-                    const[y,m]=k.split("-");
-                    return <option key={k} value={`${y}-${m}`}>{mLbl(k)}</option>;
-                  })}
+                  {statYearOpts.map(({year,months})=>(
+                    <optgroup key={year} label={`── ${year} ──`}>
+                      <option value={`${year}-0`}>ทั้งปี {year}</option>
+                      {months.map(m=>(
+                        <option key={m} value={`${year}-${m}`}>{MONTHS[m-1]} {year}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               <StatCards entries={statsEntries} allEntries={yearEntries}/>
