@@ -86,7 +86,7 @@ function makeApi(url, key) {
       return r.json();
     },
     async upsertRate(station, data){
-      const post = body => fetch(`${base}/${RTABLE}`,{method:"POST",headers:{...H,"Prefer":"return=representation,resolution=merge-duplicates"},body:JSON.stringify(body)});
+      const post = body => fetch(`${base}/${RTABLE}?on_conflict=station`,{method:"POST",headers:{...H,"Prefer":"return=representation,resolution=merge-duplicates"},body:JSON.stringify(body)});
       let r=await post({station,...data});
       if(!r.ok && ("color" in data || "abbr" in data)){
         const fallback={station,...data};
