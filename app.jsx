@@ -140,6 +140,10 @@ const I={
   trendDn: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 4-4 6 7"/><path d="M22 18h-6"/></svg>,
   rf:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>,
   gear:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  home:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  zap:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>,
+  pin:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+  logout:  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
 };
 
 // ── SQL ─────────────────────────────────────────────────────────
@@ -1027,81 +1031,100 @@ function App(){
 
   const handleLogout = () => { clearSession(); setAuthed(false); };
 
+  const PAGE_TITLE = {สถิติ:"ภาพรวม", รายการ:"การชาร์จ", สถานี:"สถานี"};
+
   return(
-    <div className="app">
-      {/* Top bar */}
-      <div className="topbar">
-        <div className="brand">
+    <div className="layout">
+      {/* ── Sidebar ── */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
           <div className="logo">{I.bolt}</div>
-          <div><h1>Charge Note</h1><div className="sub">บันทึกการชาร์จรถไฟฟ้า · Deepal S07</div></div>
-          {hasCfg&&status==="err"&&<span className="status-badge st-err"><span className="dot"/>เชื่อมต่อไม่ได้</span>}
+          <div><h1>Charge Note</h1><div className="sub">บันทึกการชาร์จรถไฟฟ้า</div></div>
         </div>
-        <div className="nav">
-          {["รายการ","สถิติ","สถานี"].map(t=>(
-            <button key={t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{t}</button>
-          ))}
+
+        <nav className="sidebar-nav">
+          <button className={tab==="สถิติ"?"on":""} onClick={()=>setTab("สถิติ")}>{I.home} ภาพรวม</button>
+          <button className={tab==="รายการ"?"on":""} onClick={()=>setTab("รายการ")}>{I.zap} การชาร์จ</button>
+          <button className={tab==="สถานี"?"on":""} onClick={()=>setTab("สถานี")}>{I.pin} สถานี</button>
+        </nav>
+
+        <div className="sidebar-car">
+          <img src="car.jpg" alt="Deepal S07" className="car-img" onError={e=>{e.target.style.display="none"}}/>
+          <div className="car-name">Deepal S07</div>
         </div>
-        <div className="actions">
-          {tab==="รายการ"&&<button className="btn btn-primary" onClick={()=>setModal("new")}>{I.plus} เพิ่มรายการ</button>}
-          {tab==="รายการ"&&<button className="btn btn-ghost" onClick={onExport}>{I.dl} ส่งออก</button>}
-          <button className="btn btn-ghost" onClick={handleLogout} title="ออกจากระบบ">↩</button>
+
+        <div className="sidebar-footer">
+          <button onClick={handleLogout}>{I.logout} ออกจากระบบ</button>
+        </div>
+      </aside>
+
+      {/* ── Main ── */}
+      <div className="main">
+        <div className="app">
+          {/* Page header */}
+          <div className="page-hd">
+            <div>
+              <h2>{PAGE_TITLE[tab]}</h2>
+              {hasCfg&&status==="err"&&<span className="status-badge st-err"><span className="dot"/>เชื่อมต่อไม่ได้</span>}
+            </div>
+            <div className="actions">
+              {tab==="รายการ"&&<button className="btn btn-primary" onClick={()=>setModal("new")}>{I.plus} เพิ่มรายการ</button>}
+              {tab==="รายการ"&&<button className="btn btn-ghost" onClick={onExport}>{I.dl} ส่งออก</button>}
+            </div>
+          </div>
+
+          {/* Error bar */}
+          {errMsg&&<div className="err-bar"><span>⚠️ {errMsg}</span><button onClick={()=>setErrMsg("")}>×</button></div>}
+
+          {/* Setup */}
+          {!hasCfg&&<SetupPanel onSave={onSaveCfg}/>}
+
+          {/* สถานี */}
+          {tab==="สถานี"&&<AdminPanel rates={rates} setRates={setRates} api={api}/>}
+
+          {/* ภาพรวม */}
+          {tab==="สถิติ"&&(
+            <>
+              <div className="stat-filter">
+                <div className="chip-group">
+                  {statYears.map(y=>(
+                    <button key={y} className={statYear===y?"on":""} onClick={()=>{setStatYear(y);setStatMonth(m=>statMonthsInYear.has(m)?m:1);}}>{y}</button>
+                  ))}
+                </div>
+                <div className="chip-group">
+                  <button className={statMonth===0?"on":""} onClick={()=>setStatMonth(0)}>ทั้งหมด</button>
+                  {MONTHS.map((lbl,i)=>{
+                    const m=i+1;
+                    return <button key={m} className={statMonth===m?"on":""} disabled={!statMonthsInYear.has(m)} onClick={()=>setStatMonth(m)}>{lbl}</button>;
+                  })}
+                </div>
+              </div>
+              <StatCards entries={statsEntries}/>
+              <div className="panels">
+                <ChartPanel
+                  entries={yearEntries}
+                  monthFilter={`${statYear}-${String(statMonth).padStart(2,"0")}`}
+                  setMonthFilter={(val)=>{
+                    if(!val) return;
+                    const [y,m]=val.split("-");
+                    setStatYear(+y); setStatMonth(+m);
+                  }}/>
+                <BreakdownPanel entries={statsEntries} rates={rates}/>
+              </div>
+            </>
+          )}
+
+          {/* การชาร์จ */}
+          {tab==="รายการ"&&(
+            <LogTable entries={visibleEntries} rates={rates} onEdit={e=>setModal(e)} onDelete={e=>setDel(e)} monthFilter={mf} setMonthFilter={setMf} loading={status==="loading"}/>
+          )}
+
+          {/* Modals */}
+          {modal&&<EntryModal entry={modal==="new"?null:modal} rates={rates} onClose={()=>setModal(null)} onSave={onSave} saving={saving}/>}
+          {confirmDel&&<ConfirmDel entry={confirmDel} rates={rates} onCancel={()=>setDel(null)} onConfirm={onDelConfirm} saving={saving}/>}
+          {toast&&<div className="toast">✓ {toast}</div>}
         </div>
       </div>
-
-      {/* Error bar */}
-      {errMsg&&<div className="err-bar"><span>⚠️ {errMsg}</span><button onClick={()=>setErrMsg("")}>×</button></div>}
-
-      {/* Setup — shown when no Supabase config saved yet */}
-      {!hasCfg&&<SetupPanel onSave={onSaveCfg}/>}
-
-      {/* Station tab */}
-      {tab==="สถานี"&&<AdminPanel rates={rates} setRates={setRates} api={api}/>}
-
-      {tab==="สถิติ"&&(
-        <>
-          {/* Year / Month filter */}
-          <div className="stat-filter">
-            <div className="chip-group">
-              {statYears.map(y=>(
-                <button key={y} className={statYear===y?"on":""} onClick={()=>{setStatYear(y);setStatMonth(m=>statMonthsInYear.has(m)?m:1);}}>{y}</button>
-              ))}
-            </div>
-            <div className="chip-group">
-              <button className={statMonth===0?"on":""} onClick={()=>setStatMonth(0)}>ทั้งหมด</button>
-              {MONTHS.map((lbl,i)=>{
-                const m=i+1;
-                return <button key={m} className={statMonth===m?"on":""} disabled={!statMonthsInYear.has(m)} onClick={()=>setStatMonth(m)}>{lbl}</button>;
-              })}
-            </div>
-          </div>
-          <StatCards entries={statsEntries}/>
-          <div className="panels">
-            <ChartPanel 
-              entries={yearEntries} 
-              monthFilter={`${statYear}-${String(statMonth).padStart(2,"0")}`} 
-              setMonthFilter={(val)=>{
-                if(!val) return;
-                const [y, m] = val.split("-");
-                setStatYear(+y); setStatMonth(+m);
-              }}/>
-            <BreakdownPanel entries={statsEntries} rates={rates}/>
-          </div>
-        </>
-      )}
-
-      {/* Main view */}
-      {tab==="รายการ"&&(
-        <LogTable entries={visibleEntries} rates={rates} onEdit={e=>setModal(e)} onDelete={e=>setDel(e)} monthFilter={mf} setMonthFilter={setMf} loading={status==="loading"}/>
-      )}
-
-      {/* Modals */}
-      {modal&&(
-        <EntryModal entry={modal==="new"?null:modal} rates={rates} onClose={()=>setModal(null)} onSave={onSave} saving={saving}/>
-      )}
-      {confirmDel&&(
-        <ConfirmDel entry={confirmDel} rates={rates} onCancel={()=>setDel(null)} onConfirm={onDelConfirm} saving={saving}/>
-      )}
-      {toast&&<div className="toast">✓ {toast}</div>}
     </div>
   );
 }
