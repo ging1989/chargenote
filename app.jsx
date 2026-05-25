@@ -1515,8 +1515,8 @@ function App(){
 
         <nav className="sidebar-nav">
           <button className={tab==="สถิติ"?"on":""} onClick={()=>setTab("สถิติ")}>{I.home} ภาพรวม</button>
-          <button className={tab==="รายการ"?"on":""} onClick={()=>setTab("รายการ")}>{I.zap} การชาร์จ</button>
           <button className={tab==="ค่าใช้จ่าย"?"on":""} onClick={()=>setTab("ค่าใช้จ่าย")}>{I.wallet} ค่าใช้จ่าย</button>
+          <button className={tab==="รายการ"?"on":""} onClick={()=>setTab("รายการ")}>{I.zap} การชาร์จ</button>
           <button className={tab==="สถานี"?"on":""} onClick={()=>setTab("สถานี")}>{I.pin} สถานี</button>
         </nav>
 
