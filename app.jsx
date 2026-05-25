@@ -107,12 +107,13 @@ function makeProxyApi(){
   const ok = async r => {
     if(!r.ok){
       const txt = await r.text();
-      try{
-        const j = JSON.parse(txt);
-        throw new Error(j.error||txt||r.statusText);
-      }catch(e){
-        throw new Error(txt||r.statusText);
+      if(txt.trim().startsWith('<')){
+        throw new Error(`เซิร์ฟเวอร์ตอบสนองผิดปกติ (${r.status} ${r.statusText})`);
       }
+      let msg;
+      try{ const j=JSON.parse(txt); msg=j.error||j.message||r.statusText; }
+      catch{ msg=txt||r.statusText; }
+      throw new Error(msg);
     }
   };
   return {
