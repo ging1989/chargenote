@@ -6,8 +6,8 @@ const RATES_KEY = "ev_station_rates";   // local cache ของ rates
 const TABLE     = "charging_sessions";
 const RTABLE    = "station_rates";
 const SUPABASE_DEFAULT = {
-  url:"https://znwhsbjjykkbbgqyoewl.supabase.co",
-  key:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud2hzYmpqeWtrYmJncXlvZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MDQ0MTQsImV4cCI6MjA5NTE4MDQxNH0.juLswcub25iERIJllOdO_Uf-iicbSnVuuf0FM6xoJ2M",
+  url: "",
+  key: "",
 };
 
 // ── Storage helpers ─────────────────────────────────────────────
@@ -38,7 +38,7 @@ const rateFromDb = r => ({
 
 // ── Supabase API ────────────────────────────────────────────────
 function makeApi(url, key) {
-  const base = url.replace(/\/$/,"")+"/rest/v1";
+  const base = url.replace(/\/$/,'')+"/rest/v1";
   const H = {"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key};
   const ok = async r => { if(!r.ok) throw new Error((await r.json()).message||r.statusText); };
   const withComputed = row => ({
@@ -99,6 +99,31 @@ function makeApi(url, key) {
       const r=await fetch(`${base}/${RTABLE}?station=eq.${encodeURIComponent(station)}`,{method:"DELETE",headers:H});
       await ok(r);
     },
+  };
+}
+
+// ── Backend proxy API ───────────────────────────────────────────
+function makeProxyApi(){
+  const ok = async r => {
+    if(!r.ok){
+      const txt = await r.text();
+      try{
+        const j = JSON.parse(txt);
+        throw new Error(j.error||txt||r.statusText);
+      }catch(e){
+        throw new Error(txt||r.statusText);
+      }
+    }
+  };
+  return {
+    async fetchAll(){ const r = await fetch('/api/charges'); await ok(r); return r.json(); },
+    async insert(row){ const r=await fetch('/api/charges',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}); await ok(r); return r.json(); },
+    async update(id,row){ const r=await fetch(`/api/charges/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}); await ok(r); return r.json(); },
+    async remove(id){ const r=await fetch(`/api/charges/${id}`,{method:'DELETE'}); await ok(r); },
+    async ping(){ const r=await fetch('/healthz'); await ok(r); return true; },
+    async fetchRates(){ const r=await fetch('/api/rates'); if(!r.ok) return null; return r.json(); },
+    async upsertRate(station,data){ const body={station,...data}; const r=await fetch('/api/rates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); await ok(r); },
+    async deleteRate(station){ const r=await fetch(`/api/rates/${encodeURIComponent(station)}`,{method:'DELETE'}); await ok(r); },
   };
 }
 
@@ -250,10 +275,12 @@ function SetupPanel({ onSave }) {
   const [url,setUrl]=useState(""); const [key,setKey]=useState("");
   const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [sql,setSql]=useState(false);
   const test=async()=>{
-    if(!url||!key){setErr("กรุณากรอก URL และ API Key");return;}
     setBusy(true);setErr("");
-    try{ await makeApi(url,key).ping(); onSave(url,key); }
-    catch(e){ setErr("เชื่อมต่อไม่ได้: "+e.message); }
+    try{
+      const r = await fetch('/healthz');
+      if(!r.ok) throw new Error('ไม่ตอบสนอง');
+      onSave(url,key);
+    }catch(e){ setErr("เชื่อมต่อไม่ได้: "+e.message); }
     setBusy(false);
   };
   return (
@@ -913,7 +940,7 @@ function App(){
   const [statYear,setStatYear]   = useState(_now.getFullYear());
   const [statMonth,setStatMonth] = useState(_now.getMonth()+1);
 
-  const api = useMemo(()=>cfg.url&&cfg.key?makeApi(cfg.url,cfg.key):null,[cfg.url,cfg.key]);
+  const api = useMemo(()=>makeProxyApi(),[]);
   const hasCfg = !!(cfg.url&&cfg.key);
   const visibleEntries = entries;
 
