@@ -1416,8 +1416,13 @@ function App(){
 
   const statYears = useMemo(()=>[...new Set(entries.map(e=>+e.date.slice(0,4)))].sort((a,b)=>b-a),[entries]);
   const statMonthsInYear = useMemo(()=>new Set(entries.filter(e=>+e.date.slice(0,4)===statYear).map(e=>+e.date.slice(5,7))),[entries,statYear]);
-  const statsEntries = useMemo(()=>statMonth===0?yearEntries:entries.filter(e=>+e.date.slice(0,4)===statYear&&+e.date.slice(5,7)===statMonth),[entries,statYear,statMonth,yearEntries]);
-  const yearEntries  = useMemo(()=>entries.filter(e=>+e.date.slice(0,4)===statYear),[entries,statYear]);
+  const yearEntries  = useMemo(()=>statYear===0?entries:entries.filter(e=>+e.date.slice(0,4)===statYear),[entries,statYear]);
+  const statsEntries = useMemo(()=>statYear===0||statMonth===0?yearEntries:entries.filter(e=>+e.date.slice(0,4)===statYear&&+e.date.slice(5,7)===statMonth),[entries,statYear,statMonth,yearEntries]);
+  const statMonthOpts = useMemo(()=>{
+    const by={};
+    entries.forEach(e=>{const k=mKey(e.date);if(!by[k])by[k]=1;});
+    return Object.keys(by).sort().reverse();
+  },[entries]);
   const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),1800);};
 
@@ -1552,24 +1557,27 @@ function App(){
           {tab==="สถิติ"&&(
             <>
               <div className="stat-filter">
-                <div className="chip-group">
-                  {statYears.map(y=>(
-                    <button key={y} className={statYear===y?"on":""} onClick={()=>{setStatYear(y);setStatMonth(m=>statMonthsInYear.has(m)?m:1);}}>{y}</button>
-                  ))}
-                </div>
-                <div className="chip-group">
-                  <button className={statMonth===0?"on":""} onClick={()=>setStatMonth(0)}>ทั้งหมด</button>
-                  {MONTHS.map((lbl,i)=>{
-                    const m=i+1;
-                    return <button key={m} className={statMonth===m?"on":""} disabled={!statMonthsInYear.has(m)} onClick={()=>setStatMonth(m)}>{lbl}</button>;
+                <select
+                  value={statYear===0?"all":`${statYear}-${String(statMonth).padStart(2,"0")}`}
+                  onChange={e=>{
+                    const v=e.target.value;
+                    if(v==="all"){setStatYear(0);setStatMonth(0);}
+                    else{const[y,m]=v.split("-");setStatYear(+y);setStatMonth(+m);}
+                  }}
+                  style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
+                >
+                  <option value="all">ทั้งหมด</option>
+                  {statMonthOpts.map(k=>{
+                    const[y,m]=k.split("-");
+                    return <option key={k} value={`${y}-${m}`}>{mLbl(k)}</option>;
                   })}
-                </div>
+                </select>
               </div>
               <StatCards entries={statsEntries} allEntries={yearEntries}/>
               <div className="panels">
                 <ChartPanel
                   entries={yearEntries}
-                  monthFilter={statMonth!==0?`${statYear}-${String(statMonth).padStart(2,"0")}`:null}
+                  monthFilter={statYear!==0&&statMonth!==0?`${statYear}-${String(statMonth).padStart(2,"0")}`:null}
                   setMonthFilter={(val)=>{
                     if(!val) return;
                     const [y,m]=val.split("-");
