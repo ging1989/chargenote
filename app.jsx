@@ -141,6 +141,7 @@ const I={
   rf:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>,
   gear:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   home:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  wallet:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>,
   zap:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>,
   pin:     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
   logout:  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
@@ -566,6 +567,340 @@ function DashboardBottom({entries,rates}){
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Line Chart ──────────────────────────────────────────────────
+function LineChart({data,color="#6CAE76",h=200}){
+  if(!data||data.length<2) return <div style={{height:h,display:"grid",placeItems:"center",color:"var(--ink-3)",fontSize:13}}>ยังไม่มีข้อมูล</div>;
+  const pL=44,pR=16,pT=16,pB=32,W=480;
+  const cw=W-pL-pR,ch=h-pT-pB;
+  const maxV=Math.max(...data.map(d=>d.value),1);
+  const pts=data.map((d,i)=>({x:pL+(i/(data.length-1))*cw,y:pT+ch-(d.value/maxV)*ch,...d}));
+  const linePath=pts.map((p,i)=>`${i===0?"M":"L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const area=`${linePath} L${pts[pts.length-1].x.toFixed(1)},${pT+ch} L${pts[0].x.toFixed(1)},${pT+ch} Z`;
+  const yTicks=[0,0.25,0.5,0.75,1];
+  return(
+    <svg width="100%" viewBox={`0 0 ${W} ${h}`} style={{overflow:"visible",display:"block"}}>
+      <defs>
+        <linearGradient id="lc-fill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity=".18"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      {yTicks.slice(1).map(f=>(
+        <line key={f} x1={pL} x2={W-pR} y1={pT+ch*(1-f)} y2={pT+ch*(1-f)} stroke="var(--line)" strokeDasharray="4 3" strokeWidth="1"/>
+      ))}
+      {yTicks.map(f=>(
+        <text key={f} x={pL-6} y={pT+ch*(1-f)+4} textAnchor="end" fontSize="10" fill="var(--ink-3)" fontFamily="inherit">
+          {maxV*f>=1000?(maxV*f/1000).toFixed(0)+"k":(maxV*f).toFixed(0)}
+        </text>
+      ))}
+      <path d={area} fill="url(#lc-fill)"/>
+      <path d={linePath} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      {pts.map((p,i)=>(
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r={i===pts.length-1?5:3.5} fill={i===pts.length-1?color:"#fff"} stroke={color} strokeWidth="2"/>
+          {i===pts.length-1&&<text x={p.x} y={p.y-10} textAnchor="middle" fontSize="11" fontWeight="700" fill={color} fontFamily="inherit">{p.label2||""}</text>}
+          <text x={p.x} y={pT+ch+16} textAnchor="middle" fontSize="11" fill="var(--ink-3)" fontFamily="inherit">{p.label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// ── Expense Page ─────────────────────────────────────────────────
+const BUDGET_KEY="ev_budget";
+function ExpensePage({entries,rates}){
+  const now=new Date();
+  const [subTab,setSubTab]=useState("ภาพรวม");
+  const years=useMemo(()=>[...new Set(entries.map(e=>+e.date.slice(0,4)))].sort((a,b)=>b-a),[entries]);
+  const [yr,setYr]=useState(()=>now.getFullYear());
+  const [mo,setMo]=useState(()=>now.getMonth()+1);
+  const [budget,setBudget]=useState(()=>+localStorage.getItem(BUDGET_KEY)||0);
+  const [editBudget,setEditBudget]=useState(false);
+  const [budgetInput,setBudgetInput]=useState("");
+
+  const monthKey=`${yr}-${String(mo).padStart(2,"0")}`;
+  const prevKey=(()=>{const d=new Date(monthKey+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
+  const mE=useMemo(()=>entries.filter(e=>e.date.startsWith(monthKey)),[entries,monthKey]);
+  const pE=useMemo(()=>entries.filter(e=>e.date.startsWith(prevKey)),[entries,prevKey]);
+  const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
+
+  const totC=sum(mE,"final_price"),totK=sum(mE,"kwh"),totD=sum(mE,"discount");
+  const avgSess=mE.length?totC/mE.length:0,avgRate=totK?totC/totK:0;
+  const pC=sum(pE,"final_price"),pK=sum(pE,"kwh");
+  const pAvg=pK?pC/pK:0;
+  const pct=(a,b)=>b?((a-b)/b)*100:null;
+  const discSessions=mE.filter(e=>+e.discount>0).length;
+
+  const trendData=useMemo(()=>{
+    const by={};
+    entries.forEach(e=>{const k=mKey(e.date);if(!by[k])by[k]={cost:0,kwh:0};by[k].cost+=+e.final_price||0;by[k].kwh+=+e.kwh||0;});
+    return Object.entries(by).sort(([a],[b])=>a<b?-1:1).slice(-8).map(([k,v])=>({label:mLbl(k),value:v.cost,label2:THB(v.cost)}));
+  },[entries]);
+
+  const stBd=useMemo(()=>{
+    const by={};
+    mE.forEach(e=>{if(!by[e.station])by[e.station]={kwh:0,cost:0,n:0};by[e.station].kwh+=+e.kwh||0;by[e.station].cost+=+e.final_price||0;by[e.station].n++;});
+    const tot=Object.values(by).reduce((a,v)=>a+v.cost,0);
+    return{items:Object.entries(by).map(([k,v])=>({key:k,...v,pct:tot?v.cost/tot*100:0,color:smeta(k,rates).color,abbr:smeta(k,rates).abbr})).sort((a,b)=>b.cost-a.cost),tot};
+  },[mE,rates]);
+
+  const pkBd=useMemo(()=>{
+    const MAP={on_peak:{lbl:"On Peak",color:"#E87B6A"},off_peak:{lbl:"Off Peak",color:"#6AAAE8"},null:{lbl:"Flat Rate",color:"#6CAE76"}};
+    const by={};
+    mE.forEach(e=>{const k=String(e.peak_type||"null");if(!by[k])by[k]={...MAP[k]||{lbl:k,color:"#999"},cost:0,kwh:0,n:0};by[k].cost+=+e.final_price||0;by[k].kwh+=+e.kwh||0;by[k].n++;});
+    const tot=Object.values(by).reduce((a,v)=>a+v.cost,0);
+    return{items:Object.values(by).filter(v=>v.n>0).map(v=>({...v,pct:tot?v.cost/tot*100:0,value:v.cost})),tot};
+  },[mE]);
+
+  const budgetPct=budget>0?Math.min(totC/budget*100,100):0;
+  const MONTHS_TH=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const monthOpts=useMemo(()=>{
+    const opts=[];
+    years.forEach(y=>MONTHS_TH.forEach((_,i)=>{const k=`${y}-${String(i+1).padStart(2,"0")}`;if(entries.some(e=>e.date.startsWith(k)))opts.push({y,m:i+1,k,lbl:`${MONTHS_TH[i]} ${y+543}`});}));
+    return opts.reverse();
+  },[entries,years]);
+
+  const DeltaBadge=({d,invert=false})=>{
+    if(d==null||Math.abs(d)<0.05) return null;
+    const up=invert?d<0:d>0;
+    return <span className={"delta "+(up?"":"down")} style={{fontSize:11,marginLeft:6}}>{d>=0?"+":""}{d.toFixed(1)}%</span>;
+  };
+
+  // ─── Stat cards ───
+  const statCards=[
+    {lbl:"ค่าใช้จ่ายรวม",val:THB(totC),d:pct(totC,pC),inv:true,icon:"💳",bg:"#E87B6A20"},
+    {lbl:"เฉลี่ยต่อครั้ง",val:THB(avgSess),d:pct(avgSess,pC&&pE.length?pC/pE.length:0),inv:true,icon:"⚡",bg:"#6AAAE820"},
+    {lbl:"ราคาเฉลี่ย kWh",val:NUM(avgRate,2)+" ฿/kWh",d:pct(avgRate,pAvg),inv:true,icon:"📊",bg:"#6CAE7620"},
+    {lbl:"ส่วนลดรวม",val:THB(totD),sub:discSessions+" รายการ",icon:"🏷️",bg:"#F5A62320"},
+  ];
+
+  // ─── Station breakdown for sub-tab ───
+  const StationBreakdown=()=>(
+    <div>
+      <div style={{display:"flex",gap:20,alignItems:"center",marginBottom:16}}>
+        <DonutChart segments={stBd.items.map(b=>({value:b.cost,color:b.color}))} total={stBd.tot} centerText={THB(stBd.tot)} size={150}/>
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:10}}>
+          {stBd.items.map(b=>(
+            <div key={b.key} style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:10,height:10,borderRadius:3,background:b.color,flexShrink:0}}/>
+              <div style={{flex:1,fontSize:13,fontWeight:600,color:"var(--ink-2)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.key}</div>
+              <span style={{fontSize:12,color:"var(--ink-3)",minWidth:36,textAlign:"right"}}>{b.pct.toFixed(0)}%</span>
+              <span style={{fontSize:13,fontWeight:700,color:"var(--ink)",minWidth:70,textAlign:"right"}}>{THB(b.cost)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return(
+    <div>
+      {/* Month selector + sub-nav */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <p style={{margin:0,fontSize:13,color:"var(--ink-3)"}}>วิเคราะห์และจัดการค่าใช้จ่ายในการชาร์จ</p>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <select className="field input" style={{fontSize:13,padding:"6px 10px",borderRadius:8,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer"}}
+            value={monthKey} onChange={e=>{const[y,m]=e.target.value.split("-");setYr(+y);setMo(+m);}}>
+            {monthOpts.map(o=><option key={o.k} value={o.k}>{o.lbl}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="chip-group" style={{marginBottom:20,width:"fit-content"}}>
+        {["ภาพรวม","แนวโน้ม","แยกตามสถานี","แยกตามหมวด"].map(t=>(
+          <button key={t} className={subTab===t?"on":""} onClick={()=>setSubTab(t)}>{t}</button>
+        ))}
+      </div>
+
+      {/* ── ภาพรวม ── */}
+      {subTab==="ภาพรวม"&&(<>
+        {/* Stat cards */}
+        <div className="stats" style={{marginBottom:16}}>
+          {statCards.map((c,i)=>(
+            <div className="stat" key={i} style={{minHeight:"unset"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div className="lbl">{c.lbl}</div>
+                <div style={{fontSize:20}}>{c.icon}</div>
+              </div>
+              <div className="val" style={{marginTop:8,fontSize:22}}>{c.val}</div>
+              {c.d!=null?<DeltaBadge d={c.d} invert={c.inv}/>:c.sub&&<span style={{fontSize:12,color:"var(--ink-3)"}}>{c.sub}</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* Chart + Breakdown */}
+        <div className="panels" style={{marginBottom:16}}>
+          <div className="panel" style={{minHeight:"unset"}}>
+            <div className="panel-hd"><h3>แนวโน้มค่าใช้จ่าย</h3></div>
+            <LineChart data={trendData} color="var(--leaf-2)" h={200}/>
+          </div>
+          <div className="panel" style={{minHeight:"unset"}}>
+            <h3>แยกตามสถานี</h3>
+            <div className="panel-sub" style={{marginBottom:14}}>{MONTHS_TH[mo-1]} {yr+543}</div>
+            <StationBreakdown/>
+          </div>
+        </div>
+
+        {/* Comparison + Budget + Savings */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:16}}>
+          {/* เปรียบเทียบกับเดือนก่อน */}
+          <div className="panel" style={{minHeight:"unset",padding:18}}>
+            <h3 style={{marginBottom:14}}>เปรียบเทียบกับเดือนก่อน</h3>
+            {[
+              {lbl:"ค่าใช้จ่ายรวม",cur:totC,prv:pC,fmt:THB,inv:true},
+              {lbl:"พลังงาน",cur:totK,prv:pK,fmt:v=>NUM(v,1)+" kWh"},
+              {lbl:"ราคาเฉลี่ย",cur:avgRate,prv:pAvg,fmt:v=>NUM(v,2)+" ฿/kWh",inv:true},
+            ].map((r,i)=>{
+              const d=pct(r.cur,r.prv);
+              const up=r.inv?d<0:d>0;
+              return(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingBottom:10,marginBottom:10,borderBottom:i<2?"1px solid var(--line)":"none"}}>
+                  <div>
+                    <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:2}}>{r.lbl}</div>
+                    <div style={{fontSize:14,fontWeight:700}}>{r.fmt(r.cur)}</div>
+                    <div style={{fontSize:11,color:"var(--ink-3)"}}>จาก {r.fmt(r.prv)}</div>
+                  </div>
+                  {d!=null&&<span className={"delta "+(up?"":"down")} style={{fontSize:12}}>{d>=0?"+":""}{d.toFixed(1)}%</span>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* งบประมาณ */}
+          <div className="panel" style={{minHeight:"unset",padding:18}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <h3>งบประมาณเดือนนี้</h3>
+              <button className="btn btn-ghost" style={{fontSize:11,padding:"3px 8px"}} onClick={()=>{setBudgetInput(String(budget));setEditBudget(true);}}>ตั้งค่า</button>
+            </div>
+            {editBudget&&(
+              <div style={{display:"flex",gap:6,marginBottom:12}}>
+                <input type="number" value={budgetInput} onChange={e=>setBudgetInput(e.target.value)} style={{flex:1,padding:"6px 8px",borderRadius:8,border:"1px solid var(--line)",fontFamily:"inherit",fontSize:13}} placeholder="งบประมาณ (฿)"/>
+                <button className="btn btn-primary" style={{padding:"6px 10px",fontSize:12}} onClick={()=>{const v=+budgetInput;if(v>=0){localStorage.setItem(BUDGET_KEY,v);setBudget(v);}setEditBudget(false);}}>บันทึก</button>
+              </div>
+            )}
+            {budget>0?(
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+                <div style={{position:"relative",width:110,height:110}}>
+                  <DonutChart segments={[{value:budgetPct,color:budgetPct>=90?"#E87B6A":"var(--leaf-2)"},{value:100-budgetPct,color:"var(--line)"}]} total={100} size={110}/>
+                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
+                    <span style={{fontSize:18,fontWeight:700,color:"var(--ink)"}}>{budgetPct.toFixed(0)}%</span>
+                  </div>
+                </div>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:14,fontWeight:700}}>{THB(totC)} / {THB(budget)}</div>
+                  <div style={{fontSize:12,color:budget-totC<0?"#E87B6A":"var(--leaf-2)",marginTop:4}}>
+                    {budget-totC>=0?`เหลืออีก ${THB(budget-totC)}`:`เกินงบ ${THB(totC-budget)}`}
+                  </div>
+                </div>
+              </div>
+            ):<div style={{fontSize:13,color:"var(--ink-3)",textAlign:"center",paddingTop:20}}>กดตั้งค่าเพื่อกำหนดงบประมาณ</div>}
+          </div>
+
+          {/* ส่วนลด */}
+          <div className="panel" style={{minHeight:"unset",padding:18}}>
+            <h3 style={{marginBottom:14}}>ประหยัดได้จากส่วนลด</h3>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,paddingTop:12}}>
+              <div style={{fontSize:36}}>🏷️</div>
+              <div style={{fontSize:26,fontWeight:700,color:"var(--leaf-2)"}}>{THB(totD)}</div>
+              <div style={{fontSize:13,color:"var(--ink-3)"}}>จาก {discSessions} รายการ</div>
+              {totC>0&&<div style={{fontSize:12,color:"var(--ink-3)",marginTop:4}}>คิดเป็น {(totD/(totC+totD)*100).toFixed(1)}% ของค่าใช้จ่ายก่อนลด</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent expenses */}
+        <div className="panel" style={{minHeight:"unset",padding:18}}>
+          <h3 style={{marginBottom:14}}>รายการค่าใช้จ่ายล่าสุด</h3>
+          {mE.length===0?<div style={{textAlign:"center",color:"var(--ink-3)",padding:"20px 0",fontSize:13}}>ยังไม่มีรายการในเดือนนี้</div>:(
+            <div className="twrap">
+              <table>
+                <thead><tr>
+                  <th>วันที่</th><th>สถานี</th>
+                  <th className="num">พลังงาน (kWh)</th>
+                  <th className="num">ราคา/kWh</th>
+                  <th className="num">ส่วนลด</th>
+                  <th className="num">ยอดรวม</th>
+                  <th>หมายเหตุ</th>
+                </tr></thead>
+                <tbody>
+                  {[...mE].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
+                    const s=smeta(e.station,rates);
+                    return(
+                      <tr key={e.id}>
+                        <td className="date">{dLbl(e.date)}</td>
+                        <td className="station"><div className="station-cell"><div className="badge" style={{background:s.color}}>{s.abbr}</div><div>{e.station}</div></div></td>
+                        <td className="num">{NUM(e.kwh,1)}</td>
+                        <td className="num">{NUM(e.baht_per_kwh,2)}</td>
+                        <td className="num" style={{color:+e.discount>0?"var(--leaf-2)":"var(--muted)"}}>{+e.discount>0?"−"+THB(e.discount):"—"}</td>
+                        <td className="num" style={{fontWeight:600}}>{THB(e.final_price)}</td>
+                        <td style={{fontSize:12,color:"var(--ink-3)"}}>{e.trip||"—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </>)}
+
+      {/* ── แนวโน้ม ── */}
+      {subTab==="แนวโน้ม"&&(
+        <div className="panel">
+          <div className="panel-hd"><h3>แนวโน้มค่าใช้จ่ายรายเดือน</h3></div>
+          <LineChart data={trendData} color="var(--leaf-2)" h={280}/>
+        </div>
+      )}
+
+      {/* ── แยกตามสถานี ── */}
+      {subTab==="แยกตามสถานี"&&(
+        <div className="panel">
+          <h3 style={{marginBottom:4}}>แยกตามสถานี</h3>
+          <div className="panel-sub" style={{marginBottom:20}}>{MONTHS_TH[mo-1]} {yr+543} · {mE.length} รายการ</div>
+          <StationBreakdown/>
+          {stBd.items.map(b=>(
+            <div key={b.key} className="bd-row">
+              <div className="dot" style={{background:b.color+"28",color:b.color}}>{b.abbr}</div>
+              <div className="info">
+                <div className="name">{b.key}</div>
+                <div className="meta">{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
+                <div className="bd-bar"><i style={{width:b.pct+"%",background:b.color}}/></div>
+              </div>
+              <div><div className="amt">{THB(b.cost)}</div><div className="pct">{b.pct.toFixed(1)}%</div></div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── แยกตามหมวด (peak type) ── */}
+      {subTab==="แยกตามหมวด"&&(
+        <div className="panel">
+          <h3 style={{marginBottom:4}}>แยกตามประเภทชาร์จ</h3>
+          <div className="panel-sub" style={{marginBottom:20}}>{MONTHS_TH[mo-1]} {yr+543}</div>
+          <div style={{display:"flex",gap:20,alignItems:"center",marginBottom:20}}>
+            <DonutChart segments={pkBd.items} total={pkBd.tot} centerText={THB(pkBd.tot)} size={150}/>
+            <div style={{flex:1,display:"flex",flexDirection:"column",gap:12}}>
+              {pkBd.items.map((b,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:12,height:12,borderRadius:3,background:b.color,flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600}}>{b.lbl}</div>
+                    <div style={{fontSize:11,color:"var(--ink-3)"}}>{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:14,fontWeight:700}}>{THB(b.cost)}</div>
+                    <div style={{fontSize:11,color:"var(--ink-3)"}}>{b.pct.toFixed(1)}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1161,7 +1496,7 @@ function App(){
 
   const handleLogout = () => { clearSession(); setAuthed(false); };
 
-  const PAGE_TITLE = {สถิติ:"ภาพรวม", รายการ:"การชาร์จ", สถานี:"สถานี"};
+  const PAGE_TITLE = {สถิติ:"ภาพรวม", รายการ:"การชาร์จ", สถานี:"สถานี", ค่าใช้จ่าย:"ค่าใช้จ่าย"};
 
   return(
     <div className="layout">
@@ -1175,6 +1510,7 @@ function App(){
         <nav className="sidebar-nav">
           <button className={tab==="สถิติ"?"on":""} onClick={()=>setTab("สถิติ")}>{I.home} ภาพรวม</button>
           <button className={tab==="รายการ"?"on":""} onClick={()=>setTab("รายการ")}>{I.zap} การชาร์จ</button>
+          <button className={tab==="ค่าใช้จ่าย"?"on":""} onClick={()=>setTab("ค่าใช้จ่าย")}>{I.wallet} ค่าใช้จ่าย</button>
           <button className={tab==="สถานี"?"on":""} onClick={()=>setTab("สถานี")}>{I.pin} สถานี</button>
         </nav>
 
@@ -1244,6 +1580,9 @@ function App(){
               <DashboardBottom entries={statsEntries} rates={rates}/>
             </>
           )}
+
+          {/* ค่าใช้จ่าย */}
+          {tab==="ค่าใช้จ่าย"&&<ExpensePage entries={entries} rates={rates}/>}
 
           {/* การชาร์จ */}
           {tab==="รายการ"&&(
