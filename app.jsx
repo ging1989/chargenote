@@ -6,8 +6,8 @@ const RATES_KEY = "ev_station_rates";   // local cache ของ rates
 const TABLE     = "charging_sessions";
 const RTABLE    = "station_rates";
 const SUPABASE_DEFAULT = {
-  url: "",
-  key: "",
+  url: "https://znwhsbjjykkbbgqyoewl.supabase.co",
+  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud2hzYmpqeWtrYmJncXlvZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MDQ0MTQsImV4cCI6MjA5NTE4MDQxNH0.juLswcub25iERIJllOdO_Uf-iicbSnVuuf0FM6xoJ2M",
 };
 
 // ── Storage helpers ─────────────────────────────────────────────
@@ -276,11 +276,11 @@ function SetupPanel({ onSave }) {
   const [url,setUrl]=useState(""); const [key,setKey]=useState("");
   const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [sql,setSql]=useState(false);
   const test=async()=>{
+    if(!url||!key){ setErr("กรุณากรอก URL และ Key"); return; }
     setBusy(true);setErr("");
     try{
-      const r = await fetch('/healthz');
-      if(!r.ok) throw new Error('ไม่ตอบสนอง');
-      onSave(url,key);
+      await makeApi(url.trim(),key.trim()).ping();
+      onSave(url.trim(),key.trim());
     }catch(e){ setErr("เชื่อมต่อไม่ได้: "+e.message); }
     setBusy(false);
   };
@@ -926,7 +926,7 @@ class ErrorBoundary extends React.Component {
 // ── App ─────────────────────────────────────────────────────────
 function App(){
   const [authed,setAuthed]   = useState(isSessionActive);
-  const [cfg]                = useState(loadCfg);
+  const [cfg, setCfg]        = useState(loadCfg);
   const [rates,setRates]     = useState(loadRates);
   const [entries,setEntries] = useState([]);
   const [status,setStatus]   = useState("idle");
@@ -941,7 +941,7 @@ function App(){
   const [statYear,setStatYear]   = useState(_now.getFullYear());
   const [statMonth,setStatMonth] = useState(_now.getMonth()+1);
 
-  const api = useMemo(()=>makeProxyApi(),[]);
+  const api = useMemo(()=>cfg.url&&cfg.key?makeApi(cfg.url,cfg.key):null,[cfg.url,cfg.key]);
   const hasCfg = !!(cfg.url&&cfg.key);
   const visibleEntries = entries;
 
@@ -1003,6 +1003,12 @@ function App(){
     finally{setSaving(false);}
   };
 
+  const onSaveCfg=(url,key)=>{
+    const c={url,key};
+    localStorage.setItem(CFG_KEY,JSON.stringify(c));
+    setCfg(c);
+  };
+
   const onExport=()=>{
     const rows=[
       ["date","station","peak_type","trip","kwh","price_before_disc","discount","final_price","baht_per_kwh","rate_snapshot"],
@@ -1044,6 +1050,9 @@ function App(){
 
       {/* Error bar */}
       {errMsg&&<div className="err-bar"><span>⚠️ {errMsg}</span><button onClick={()=>setErrMsg("")}>×</button></div>}
+
+      {/* Setup — shown when no Supabase config saved yet */}
+      {!hasCfg&&<SetupPanel onSave={onSaveCfg}/>}
 
       {/* Station tab */}
       {tab==="สถานี"&&<AdminPanel rates={rates} setRates={setRates} api={api}/>}
