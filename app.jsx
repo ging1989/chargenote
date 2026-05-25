@@ -1422,7 +1422,7 @@ function App(){
   const statYearOpts = useMemo(()=>{
     const by={};
     entries.forEach(e=>{const y=+e.date.slice(0,4),m=+e.date.slice(5,7);if(!by[y])by[y]=new Set();by[y].add(m);});
-    return Object.entries(by).sort(([a],[b])=>+b-+a).map(([y,ms])=>({year:+y,months:[...ms].sort((a,b)=>b-a)}));
+    return Object.entries(by).sort(([a],[b])=>+a-+b).map(([y,ms])=>({year:+y,months:[...ms].sort((a,b)=>a-b)}));
   },[entries]);
   const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),1800);};
