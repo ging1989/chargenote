@@ -19,6 +19,7 @@ const saveRates = r  => localStorage.setItem(RATES_KEY, JSON.stringify(r));
 const THB  = n => "฿"+Number(n||0).toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
 const NUM  = (n,d=2) => Number(n||0).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const mKey = d => d.slice(0,7);
+const MONTHS_FULL=["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
 const mLbl = k => { const [y,m]=k.split("-"); return ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."][+m-1]+" "+String(+y+543).slice(-2); };
 const dLbl = d => { const dt=new Date(d+"T00:00:00"),mo=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."]; return dt.getDate()+" "+mo[dt.getMonth()]+" "+String(dt.getFullYear()+543).slice(-2); };
 const smeta = (name,rates) => rates[name] || { type:"flat", flat:0, color:"#8AA08C", abbr:(name||"??").slice(0,2).toUpperCase() };
@@ -1556,7 +1557,7 @@ function App(){
           {/* ภาพรวม */}
           {tab==="สถิติ"&&(
             <>
-              <div className="stat-filter" style={{flexDirection:"row",alignItems:"center",gap:8}}>
+              <div className="stat-filter" style={{flexDirection:"row",alignItems:"center",justifyContent:"flex-end",gap:8}}>
                 <select
                   value={statYear===0?"all":statYear}
                   onChange={e=>{const v=e.target.value;setStatYear(v==="all"?0:+v);setStatMonth(0);}}
@@ -1576,7 +1577,7 @@ function App(){
                   {(statYear===0?statYearOpts.flatMap(o=>o.months.map(m=>({year:o.year,m}))):
                     (statYearOpts.find(o=>o.year===statYear)?.months||[]).map(m=>({year:statYear,m}))
                   ).map(({year,m})=>(
-                    <option key={`${year}-${m}`} value={m}>{MONTHS[m-1]}</option>
+                    <option key={`${year}-${m}`} value={m}>{MONTHS_FULL[m-1]}</option>
                   ))}
                 </select>
               </div>
