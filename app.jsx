@@ -322,46 +322,119 @@ function SetupPanel({ onSave }) {
   );
 }
 
+// ── Sparkline ───────────────────────────────────────────────────
+function Sparkline({data,color="#6CAE76",w=88,h=28}){
+  if(!data||data.length<2) return null;
+  const min=Math.min(...data),max=Math.max(...data),rng=max-min||1;
+  const pts=data.map((v,i)=>`${(i/(data.length-1))*w},${h-(v-min)/rng*h}`).join(" ");
+  return(
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{overflow:"visible",display:"block"}}>
+      <defs><linearGradient id={"sg"+color.replace("#","")} x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stopColor={color} stopOpacity=".18"/>
+        <stop offset="100%" stopColor={color} stopOpacity="0"/>
+      </linearGradient></defs>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+// ── Donut Chart ─────────────────────────────────────────────────
+function DonutChart({segments,total,centerText,size=140}){
+  const cx=size/2,cy=size/2,r=size*0.34,sw=size*0.16;
+  const circ=2*Math.PI*r;
+  let acc=0;
+  const arcs=segments.map(s=>{
+    const frac=(total?s.value/total:0);
+    const dash=frac*circ;
+    const arc={...s,dash,offset:acc};
+    acc+=dash;
+    return arc;
+  });
+  return(
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--line)" strokeWidth={sw}/>
+      {arcs.map((a,i)=>(
+        <circle key={i} cx={cx} cy={cy} r={r} fill="none"
+          stroke={a.color} strokeWidth={sw}
+          strokeDasharray={`${a.dash} ${circ-a.dash}`}
+          strokeDashoffset={circ/4-a.offset}
+          style={{transform:`rotate(-90deg)`,transformOrigin:`${cx}px ${cy}px`}}/>
+      ))}
+      {centerText&&(<>
+        <text x={cx} y={cy-6} textAnchor="middle" fontSize={size*0.072} fill="var(--ink-3)" fontFamily="inherit">รวม</text>
+        <text x={cx} y={cy+10} textAnchor="middle" fontSize={size*0.095} fontWeight="700" fill="var(--ink)" fontFamily="inherit">{centerText}</text>
+      </>)}
+    </svg>
+  );
+}
+
 // ── Stat Cards ──────────────────────────────────────────────────
-function StatCards({entries}){
+function StatCards({entries,allEntries}){
+  const monthlyHistory=useMemo(()=>{
+    const by={};
+    (allEntries||entries).forEach(e=>{
+      const k=mKey(e.date);
+      if(!by[k]) by[k]={kwh:0,cost:0,n:0};
+      by[k].kwh+=+e.kwh||0; by[k].cost+=+e.final_price||0; by[k].n++;
+    });
+    return Object.entries(by).sort(([a],[b])=>a<b?-1:1).slice(-6).map(([,v])=>v);
+  },[allEntries,entries]);
+
   const s=useMemo(()=>{
+    const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
+    const totK=sum(entries,"kwh"),totC=sum(entries,"final_price");
     const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
     const now=sorted.length?sorted[0].date.slice(0,7):mKey(new Date().toISOString());
     const prev=(()=>{const d=new Date(now+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
-    const tm=entries.filter(e=>e.date.startsWith(now)), pm=entries.filter(e=>e.date.startsWith(prev));
-    const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
-    const tmK=sum(tm,"kwh"),pmK=sum(pm,"kwh"),tmC=sum(tm,"final_price"),pmC=sum(pm,"final_price");
-    const pct=(a,b)=>b?((a-b)/b)*100:0;
-    return{tmKwh:tmK,tmCost:tmC,tmAvg:tmK?tmC/tmK:0,tmDisc:sum(tm,"discount"),sessions:tm.length,kD:pct(tmK,pmK),cD:pct(tmC,pmC)};
+    const pm=entries.filter(e=>e.date.startsWith(prev));
+    const pmK=sum(pm,"kwh"),pmC=sum(pm,"final_price");
+    const pct=(a,b)=>b?((a-b)/b)*100:null;
+    return{totKwh:totK,totCost:totC,avgRate:totK?totC/totK:0,sessions:entries.length,kD:pct(totK,pmK),cD:pct(totC,pmC)};
   },[entries]);
+
+  const CARD_COLORS=["#6CAE76","#E87B6A","#6AAAE8","#B98CE8"];
+  const CARD_ICONS=[
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>,
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  ];
   const cards=[
-    {lbl:"พลังงานเดือนนี้",val:NUM(s.tmKwh,2),suffix:"kWh",delta:s.kD},
-    {lbl:"ค่าใช้จ่ายเดือนนี้",val:THB(s.tmCost),delta:s.cD,invert:true},
-    {lbl:"ราคาเฉลี่ย",val:NUM(s.tmAvg,2),suffix:"฿/kWh"},
-    {lbl:"ส่วนลดรวมเดือนนี้",val:THB(s.tmDisc),isPos:true},
+    {lbl:"พลังงานรวม",val:NUM(s.totKwh,1),suffix:"kWh",delta:s.kD,spark:monthlyHistory.map(m=>m.kwh)},
+    {lbl:"ค่าใช้จ่ายรวม",val:THB(s.totCost),delta:s.cD,invert:true,spark:monthlyHistory.map(m=>m.cost)},
+    {lbl:"ราคาเฉลี่ย kWh",val:NUM(s.avgRate,2),suffix:"฿/kWh",spark:monthlyHistory.map(m=>m.kwh?m.cost/m.kwh:0)},
+    {lbl:"จำนวนครั้งในการชาร์จ",val:s.sessions,suffix:"ครั้ง",spark:monthlyHistory.map(m=>m.n)},
   ];
   return(
     <div className="stats">
-      {cards.map((c,i)=>(
-        <div className="stat" key={i}>
-          <div className="accent"/>
-          <div className="lbl">{c.lbl}</div>
-          <div className="val">{c.val}{c.suffix&&<small>{" "+c.suffix}</small>}</div>
-          {c.delta!==undefined&&Math.abs(c.delta)>0.1&&(
-            <div className={"delta "+((c.invert?c.delta<0:c.delta>0)?"":"down")}>
-              {c.delta>=0?I.trend:I.trendDn}{(c.delta>=0?"+":"")+c.delta.toFixed(1)}% vs. เดือนก่อน
+      {cards.map((c,i)=>{
+        const clr=CARD_COLORS[i];
+        const up=c.invert?c.delta<0:c.delta>0;
+        return(
+          <div className="stat" key={i}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div className="lbl">{c.lbl}</div>
+              <div style={{width:36,height:36,borderRadius:10,background:clr+"20",display:"grid",placeItems:"center",color:clr,flexShrink:0}}>{CARD_ICONS[i]}</div>
             </div>
-          )}
-          {c.isPos&&<div className="delta">{s.sessions} ครั้ง · เดือนนี้</div>}
-        </div>
-      ))}
+            <div className="val" style={{marginTop:10}}>{c.val}{c.suffix&&<small>{" "+c.suffix}</small>}</div>
+            {c.delta!=null&&Math.abs(c.delta)>0.05&&(
+              <div className={"delta "+(up?"":"down")} style={{marginTop:6}}>
+                {up?I.trend:I.trendDn}{(c.delta>=0?"+":"")+c.delta.toFixed(1)}% จากเดือนก่อน
+              </div>
+            )}
+            <div style={{marginTop:"auto",paddingTop:12}}>
+              <Sparkline data={c.spark} color={clr}/>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ── Chart ───────────────────────────────────────────────────────
 function ChartPanel({entries,monthFilter,setMonthFilter}){
-  const [range,setRange]=useState("6");
+  const [metric,setMetric]=useState("cost");
   const data=useMemo(()=>{
     const by={};
     entries.forEach(e=>{
@@ -369,28 +442,29 @@ function ChartPanel({entries,monthFilter,setMonthFilter}){
       if(!by[k]) by[k]={cost:0,kwh:0,n:0};
       by[k].cost+=+e.final_price||0; by[k].kwh+=+e.kwh||0; by[k].n++;
     });
-    const all=Object.entries(by).sort(([a],[b])=>a<b?-1:1).map(([k,v])=>({key:k,...v}));
-    return range==="all"?all:all.slice(-(+range));
-  },[entries,range]);
-  const max=Math.max(...data.map(d=>d.cost),1);
-  const totC=data.reduce((a,d)=>a+d.cost,0), totK=data.reduce((a,d)=>a+d.kwh,0);
+    return Object.entries(by).sort(([a],[b])=>a<b?-1:1).map(([k,v])=>({key:k,...v,avg:v.kwh?v.cost/v.kwh:0}));
+  },[entries]);
+  const val=d=>metric==="cost"?d.cost:metric==="kwh"?d.kwh:d.avg;
+  const max=Math.max(...data.map(val),1);
+  const METRICS=[["cost","ค่าใช้จ่าย (฿)"],["kwh","พลังงาน (kWh)"],["avg","ราคาเฉลี่ย (฿/kWh)"]];
+  const fmt=v=>metric==="cost"?THB(v):metric==="kwh"?NUM(v,1)+" kWh":NUM(v,2)+" ฿/kWh";
   return(
     <div className="panel">
       <div className="panel-hd">
-        <div><h3>ค่าใช้จ่ายรายเดือน</h3><div className="panel-sub">{data.length} เดือน · {THB(totC)} · {NUM(totK,1)} kWh</div></div>
-        <div className="chip-group small">
-          {[["3","3ด."],["6","6ด."],["12","12ด."],["all","ทั้งหมด"]].map(([v,l])=>(
-            <button key={v} className={range===v?"on":""} onClick={()=>setRange(v)}>{l}</button>
-          ))}
-        </div>
+        <div><h3>แนวโน้มการชาร์จ</h3><div className="panel-sub">{data.length} เดือน</div></div>
+      </div>
+      <div className="chip-group small" style={{marginBottom:16,width:"fit-content"}}>
+        {METRICS.map(([v,l])=>(
+          <button key={v} className={metric===v?"on":""} onClick={()=>setMetric(v)}>{l}</button>
+        ))}
       </div>
       <div className="chart">
         {data.map(d=>{
-          const act=monthFilter===d.key, dim=monthFilter&&monthFilter!==d.key;
+          const act=monthFilter===d.key,dim=monthFilter&&monthFilter!==d.key;
           return(
-            <div key={d.key} className={"bar-wrap clickable "+(act?"active ":"")+(dim?"dim ":"")} onClick={()=>setMonthFilter(monthFilter===d.key?null:d.key)} title={`${mLbl(d.key)} · ${THB(d.cost)} · ${d.n}ครั้ง`}>
-              <div className="bar-amount">{THB(d.cost)}</div>
-              <div className="bar-stack" style={{height:(d.cost/max*100)+"%"}}><span className="bar-seg solid"/></div>
+            <div key={d.key} className={"bar-wrap clickable "+(act?"active ":"")+(dim?"dim ":"")} onClick={()=>setMonthFilter(monthFilter===d.key?null:d.key)} title={`${mLbl(d.key)} · ${fmt(val(d))}`}>
+              <div className="bar-amount">{fmt(val(d))}</div>
+              <div className="bar-stack" style={{height:(val(d)/max*100)+"%"}}><span className="bar-seg solid"/></div>
               <div className="bar-label">{mLbl(d.key)}</div>
             </div>
           );
@@ -398,7 +472,7 @@ function ChartPanel({entries,monthFilter,setMonthFilter}){
       </div>
       <div className="chart-footer">
         {monthFilter
-          ?<button className="link-btn" onClick={()=>setMonthFilter(null)}>กำลังกรองเฉพาะ <b>{mLbl(monthFilter)}</b> · ยกเลิก</button>
+          ?<button className="link-btn" onClick={()=>setMonthFilter(null)}>กรองเฉพาะ <b>{mLbl(monthFilter)}</b> · ยกเลิก</button>
           :<span className="hint-line">คลิกแท่งกราฟเพื่อกรองเดือนนั้น</span>}
       </div>
     </div>
@@ -414,27 +488,83 @@ function BreakdownPanel({entries,rates}){
       by[e.station].kwh+=+e.kwh||0; by[e.station].cost+=+e.final_price||0; by[e.station].n++;
     });
     const tot=Object.values(by).reduce((a,v)=>a+v.cost,0);
-    return Object.entries(by).map(([k,v])=>({key:k,...v,pct:tot?v.cost/tot*100:0})).sort((a,b)=>b.cost-a.cost).slice(0,6);
+    return{items:Object.entries(by).map(([k,v])=>({key:k,...v,pct:tot?v.cost/tot*100:0})).sort((a,b)=>b.cost-a.cost).slice(0,6),tot};
   },[entries]);
+  const segs=bd.items.map(b=>({value:b.cost,color:smeta(b.key,rates).color}));
   return(
     <div className="panel">
-      <h3>สัดส่วนตามสถานี</h3>
-      <div className="panel-sub" style={{marginBottom:14}}>ยอดรวมตลอดประวัติ</div>
-      <div className="breakdown-list">
-        {bd.map(b=>{
-          const s=smeta(b.key,rates);
-          return(
-            <div className="bd-row" key={b.key}>
-              <div className="dot" style={{background:s.color+"28",color:s.color}}>{s.abbr}</div>
-              <div className="info">
-                <div className="name">{b.key}</div>
-                <div className="meta">{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
-                <div className="bd-bar"><i style={{width:b.pct+"%",background:s.color}}/></div>
+      <h3>การกระจายตามสถานี</h3>
+      <div className="panel-sub" style={{marginBottom:16}}>ยอดรวมตลอดประวัติ</div>
+      <div style={{display:"flex",gap:16,alignItems:"center",marginBottom:16}}>
+        <DonutChart segments={segs} total={bd.tot} centerText={THB(bd.tot)} size={140}/>
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}>
+          {bd.items.map(b=>{
+            const s=smeta(b.key,rates);
+            return(
+              <div key={b.key} style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:10,height:10,borderRadius:3,background:s.color,flexShrink:0}}/>
+                <div style={{flex:1,fontSize:12,color:"var(--ink-2)",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.key}</div>
+                <div style={{fontSize:12,color:"var(--ink-3)",minWidth:32,textAlign:"right"}}>{b.pct.toFixed(0)}%</div>
+                <div style={{fontSize:12,fontWeight:700,color:"var(--ink)",minWidth:60,textAlign:"right"}}>{THB(b.cost)}</div>
               </div>
-              <div><div className="amt">{THB(b.cost)}</div><div className="pct">{b.pct.toFixed(1)}%</div></div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Charging Stats + Recent Activity ────────────────────────────
+function DashboardBottom({entries,rates}){
+  const stats=useMemo(()=>{
+    const sum=(f)=>entries.reduce((a,e)=>a+(+e[f]||0),0);
+    const kwh=sum("kwh"), co2=(kwh*0.495).toFixed(1);
+    return{sessions:entries.length,kwh,co2};
+  },[entries]);
+  const recent=useMemo(()=>[...entries].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5),[entries]);
+  return(
+    <div className="panels" style={{marginTop:14}}>
+      <div className="panel">
+        <h3>สถิติการชาร์จ</h3>
+        <div className="panel-sub" style={{marginBottom:18}}>ยอดรวมตลอดประวัติ</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          {[
+            {icon:"⚡",lbl:"การชาร์จทั้งหมด",val:stats.sessions+" ครั้ง"},
+            {icon:"🔋",lbl:"พลังงานรวม",val:NUM(stats.kwh,1)+" kWh"},
+            {icon:"🌿",lbl:"คาร์บอนที่ลดได้",val:stats.co2+" kg CO₂"},
+            {icon:"📅",lbl:"รายการทั้งหมด",val:stats.sessions+" รายการ"},
+          ].map((s,i)=>(
+            <div key={i} style={{background:"var(--surface-soft)",borderRadius:10,padding:"12px 14px"}}>
+              <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+              <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:4}}>{s.lbl}</div>
+              <div style={{fontSize:16,fontWeight:700,color:"var(--ink)"}}>{s.val}</div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+      </div>
+      <div className="panel">
+        <h3>กิจกรรมล่าสุด</h3>
+        <div className="panel-sub" style={{marginBottom:16}}>การชาร์จล่าสุด</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {recent.length===0&&<div style={{color:"var(--ink-3)",fontSize:13}}>ยังไม่มีรายการ</div>}
+          {recent.map(e=>{
+            const s=smeta(e.station,rates);
+            return(
+              <div key={e.id} style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:34,height:34,borderRadius:9,background:s.color,display:"grid",placeItems:"center",color:"#fff",fontSize:12,fontWeight:700,flexShrink:0}}>{s.abbr}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"var(--ink)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.station}</div>
+                  <div style={{fontSize:11,color:"var(--ink-3)"}}>{dLbl(e.date)}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"var(--ink)"}}>{THB(e.final_price)}</div>
+                  <div style={{fontSize:11,color:"var(--ink-3)"}}>{NUM(e.kwh,1)} kWh</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1099,11 +1229,11 @@ function App(){
                   })}
                 </div>
               </div>
-              <StatCards entries={statsEntries}/>
+              <StatCards entries={statsEntries} allEntries={yearEntries}/>
               <div className="panels">
                 <ChartPanel
                   entries={yearEntries}
-                  monthFilter={`${statYear}-${String(statMonth).padStart(2,"0")}`}
+                  monthFilter={statMonth!==0?`${statYear}-${String(statMonth).padStart(2,"0")}`:null}
                   setMonthFilter={(val)=>{
                     if(!val) return;
                     const [y,m]=val.split("-");
@@ -1111,6 +1241,7 @@ function App(){
                   }}/>
                 <BreakdownPanel entries={statsEntries} rates={rates}/>
               </div>
+              <DashboardBottom entries={statsEntries} rates={rates}/>
             </>
           )}
 
