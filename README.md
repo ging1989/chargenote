@@ -1,47 +1,40 @@
-# ChargeNote backend (ตัวอย่าง)
+# Charge Note
 
-คำอธิบายสั้น ๆ: ตัวอย่าง backend (Express) ที่เชื่อมกับ Supabase โดยใช้ Service Role Key
+เว็บบันทึกและวิเคราะห์ค่าใช้จ่ายการชาร์จ EV ใช้ React, Vite และ Supabase Auth/Postgres
 
-การตั้งค่า
-
-1. สร้างไฟล์ `.env` ตาม `.env.example` และใส่ค่าจริง (อย่า commit ไฟล์นี้)
-
-2. ติดตั้ง dependencies:
+## เริ่มใช้งาน
 
 ```bash
 npm install
+npm run dev
 ```
 
-3. สร้างไฟล์ `.env` หรือคัดลอกจาก `.env.example` แล้วใส่ค่าดังนี้:
+คำสั่งตรวจสอบ:
+
+```bash
+npm run check
+```
+
+## Supabase
+
+สำหรับฐานข้อมูลใหม่ ให้คัดลอก SQL จากหน้าตั้งค่าในแอปไปรันใน Supabase SQL Editor จากนั้นสร้างผู้ใช้ใน Authentication
+
+ฐานข้อมูลเดิมต้องรัน [supabase-migration.sql](./supabase-migration.sql) โดยเปลี่ยน `YOUR_LOGIN_EMAIL` เป็นอีเมล Supabase Auth ที่จะเป็นเจ้าของข้อมูลเดิมก่อน ระบบใช้ `user_id` และ Row Level Security เพื่อแยกข้อมูลของผู้ใช้แต่ละคน
+
+## Backend
+
+สร้าง `.env` จาก `.env.example`:
 
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-API_KEY=replace_with_a_random_secret_for_api
 PORT=3000
 ```
 
-4. รันเซิร์ฟเวอร์ในเครื่อง:
+ห้ามนำ service-role key ใส่ frontend หรือ commit ลง repository ทุก `/api/*` endpoint ตรวจ Supabase Bearer token และจำกัด query ด้วย `user_id`
 
 ```bash
-# ตั้งค่า .env แล้ว
-npm run dev
+npm start
 ```
 
-การใช้งานกับ Git host / Deploy
-
-- ให้ push โค้ดขึ้น Git (GitHub/GitLab/Bitbucket). ตั้ง Environment Variables (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, API_KEY, PORT) บนแพลตฟอร์มโฮสต์ก่อน deploy.
-- แพลตฟอร์มยอดนิยม: Vercel, Render, Fly, Heroku — เลือกแล้วเชื่อม repo แล้วตั้ง Secrets/Environment vars ใน Dashboard ของแต่ละบริการ
-
-ตัวอย่าง git commands:
-
-```bash
-git add .
-git commit -m "add backend skeleton"
-git push origin main
-```
-
-ข้อแนะนำความปลอดภัย
-
-- ห้ามเก็บ `SUPABASE_SERVICE_ROLE_KEY` ใน repo หรือฝังไว้ใน frontend — เก็บเฉพาะบน server/CI secrets
-- จำกัดสิทธิ์ของ service role และพิจารณาใช้ Row Level Security/Policies บน Supabase ถ้าจำเป็น
+`npm start` จะ build frontend แล้วเสิร์ฟไฟล์จาก `dist/`
