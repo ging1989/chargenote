@@ -195,45 +195,42 @@ create policy "allow all" on station_rates
   for all using (true) with check (true);`;
 
 // ── Auth ─────────────────────────────────────────────────────────
-const AUTH_KEY    = "ev_auth_hash";
 const SESSION_KEY = "ev_authed";
-
-async function hashPin(pin) {
-  const data = new TextEncoder().encode("chargenote:" + pin);
-  const buf  = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-
 const isSessionActive = () => sessionStorage.getItem(SESSION_KEY) === "1";
 const setSession      = () => sessionStorage.setItem(SESSION_KEY, "1");
 const clearSession    = () => sessionStorage.removeItem(SESSION_KEY);
-const getStoredHash   = () => localStorage.getItem(AUTH_KEY);
-const setStoredHash   = h  => localStorage.setItem(AUTH_KEY, h);
+
+async function supabaseSignIn(email, password) {
+  const url = SUPABASE_DEFAULT.url.replace(/\/$/, "") + "/auth/v1/token?grant_type=password";
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SUPABASE_DEFAULT.key },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error_description || d.message || "เข้าสู่ระบบไม่สำเร็จ");
+  }
+}
 
 function LoginScreen({ onAuth }) {
-  const hasPin = !!getStoredHash();
-  const [pin, setPin]         = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [err, setErr]         = useState("");
-  const [busy, setBusy]       = useState(false);
-  const pinRef = useRef(null);
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [err,  setErr]  = useState("");
+  const [busy, setBusy] = useState(false);
+  const emailRef = useRef(null);
 
-  useEffect(() => { pinRef.current?.focus(); }, []);
+  useEffect(() => { emailRef.current?.focus(); }, []);
 
   const submit = async () => {
-    if (!pin) { setErr("กรุณากรอก PIN"); return; }
+    if (!email || !password) { setErr("กรุณากรอก Email และ Password"); return; }
     setBusy(true); setErr("");
     try {
-      if (!hasPin) {
-        if (pin.length < 4)           { setErr("PIN ต้องมีอย่างน้อย 4 ตัว"); return; }
-        if (pin !== confirm)           { setErr("PIN ไม่ตรงกัน กรุณากรอกใหม่"); return; }
-        setStoredHash(await hashPin(pin));
-        setSession(); onAuth();
-      } else {
-        const h = await hashPin(pin);
-        if (h === getStoredHash()) { setSession(); onAuth(); }
-        else { setErr("PIN ไม่ถูกต้อง"); setPin(""); }
-      }
+      await supabaseSignIn(email, password);
+      setSession(); onAuth();
+    } catch (e) {
+      setErr("Email หรือ Password ไม่ถูกต้อง");
+      setPassword("");
     } finally { setBusy(false); }
   };
 
@@ -243,34 +240,34 @@ function LoginScreen({ onAuth }) {
     <div className="auth-scrim">
       <div className="auth-card">
         <div className="logo auth-logo">{I.bolt}</div>
-        <h2>{hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN ครั้งแรก"}</h2>
-        <p>{hasPin ? "กรอก PIN เพื่อเปิดแอป" : "ตั้ง PIN สำหรับป้องกันข้อมูล (ตัวเลขหรือตัวอักษร)"}</p>
+        <h2>เข้าสู่ระบบ</h2>
+        <p>กรอก Email และ Password เพื่อเปิดแอป</p>
         <div className="auth-fields">
           <input
-            ref={pinRef}
+            ref={emailRef}
+            type="email"
+            className="auth-input"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onKeyDown={onKey}
+            autoComplete="email"
+            style={{letterSpacing:"normal",textAlign:"left"}}
+          />
+          <input
             type="password"
             className="auth-input"
-            placeholder={hasPin ? "PIN" : "PIN ใหม่ (อย่างน้อย 4 ตัว)"}
-            value={pin}
-            onChange={e => setPin(e.target.value)}
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
             onKeyDown={onKey}
             autoComplete="current-password"
+            style={{textAlign:"left"}}
           />
-          {!hasPin && (
-            <input
-              type="password"
-              className="auth-input"
-              placeholder="ยืนยัน PIN"
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              onKeyDown={onKey}
-              autoComplete="new-password"
-            />
-          )}
         </div>
         {err && <div className="auth-err">⚠ {err}</div>}
         <button className="btn btn-primary auth-btn" onClick={submit} disabled={busy}>
-          {busy ? "กำลังตรวจสอบ…" : hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN และเข้าสู่ระบบ"}
+          {busy ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
         </button>
       </div>
     </div>
