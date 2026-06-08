@@ -1,5 +1,5 @@
-const CACHE = 'chargenote-v2';
-const ASSETS = [
+const CACHE = 'chargenote-v3';
+const STATIC = [
   './',
   './app.jsx',
   './style.css',
@@ -9,9 +9,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS))
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
   self.skipWaiting();
 });
 
@@ -25,25 +23,16 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-
-  // CDN resources — network first, fall back to cache
-  if (url.origin !== self.location.origin) {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
-    );
-    return;
-  }
-
-  // Local files — cache first, fall back to network
+  // network-first: ดึงจาก server ก่อนเสมอ ใช้ cache เฉพาะตอน offline
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+    fetch(e.request)
+      .then(res => {
+        if (res.ok && e.request.url.startsWith(self.location.origin)) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
         return res;
-      });
-    })
+      })
+      .catch(() => caches.match(e.request))
   );
 });
