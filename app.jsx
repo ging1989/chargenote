@@ -752,11 +752,7 @@ function ExpensePage({entries,rates,initialBudget,onBudgetSave}){
         </div>
 
         {/* Comparison + Budget + Savings */}
-<<<<<<< HEAD
         <div className="expense-3col">
-=======
-        <div className="expense-summary-grid">
->>>>>>> 1e02281e5b063a12f3f3c5b93dd4b387f43b2133
           {/* เปรียบเทียบกับเดือนก่อน */}
           <div className="panel" style={{minHeight:"unset",padding:18}}>
             <h3 style={{marginBottom:14}}>เปรียบเทียบกับเดือนก่อน</h3>
