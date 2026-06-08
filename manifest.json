@@ -1,0 +1,26 @@
+{
+  "name": "Charge Note",
+  "short_name": "ChargeNote",
+  "description": "บันทึกการชาร์จรถ EV Deepal S07",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F3F8F1",
+  "theme_color": "#4F9F52",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

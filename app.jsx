@@ -682,7 +682,7 @@ function ExpensePage({entries,rates}){
   // ─── Station breakdown for sub-tab ───
   const StationBreakdown=()=>(
     <div>
-      <div style={{display:"flex",gap:20,alignItems:"center",marginBottom:16}}>
+      <div style={{display:"flex",gap:20,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
         <DonutChart segments={stBd.items.map(b=>({value:b.cost,color:b.color}))} total={stBd.tot} centerText={THB(stBd.tot)} size={150}/>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:10}}>
           {stBd.items.map(b=>(
@@ -747,7 +747,7 @@ function ExpensePage({entries,rates}){
         </div>
 
         {/* Comparison + Budget + Savings */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:16}}>
+        <div className="expense-3col">
           {/* เปรียบเทียบกับเดือนก่อน */}
           <div className="panel" style={{minHeight:"unset",padding:18}}>
             <h3 style={{marginBottom:14}}>เปรียบเทียบกับเดือนก่อน</h3>
@@ -1521,7 +1521,7 @@ function App(){
         </nav>
 
         <div className="sidebar-car">
-          <img src="car.jpg" alt="Deepal S07" className="car-img" onError={e=>{e.target.style.display="none"}}/>
+          <img src="deepal.png" alt="Deepal S07" className="car-img" onError={e=>{e.target.style.display="none"}}/>
           <div className="car-name">Deepal S07</div>
         </div>
 
