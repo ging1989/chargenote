@@ -1,12 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { createRoot } from "react-dom/client";
-import { createClient } from "@supabase/supabase-js";
-import {
-  filterEntriesByPeriod,
-  getLocalDateInput,
-  previousMonthKey,
-  validateEntryForm,
-} from "./utils.mjs";
+const { useState, useMemo, useEffect, useCallback, useRef } = React;
 
 // ── Config ──────────────────────────────────────────────────────
 const CFG_KEY   = "ev_supabase_cfg";
@@ -44,36 +36,12 @@ const rateFromDb = r => ({
   abbr:r.abbr||makeAbbr(r.station),
 });
 
-function useDialog(onClose) {
-  const dialogRef=useRef(null);
-  const closeRef=useRef(onClose);
-  useEffect(()=>{closeRef.current=onClose;},[onClose]);
-  useEffect(()=>{
-    const previous=document.activeElement;
-    const dialog=dialogRef.current;
-    const focusable=()=>[...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
-    focusable()[0]?.focus();
-    const onKeyDown=e=>{
-      if(e.key==="Escape"){closeRef.current();return;}
-      if(e.key!=="Tab") return;
-      const items=focusable();
-      if(!items.length) return;
-      const first=items[0],last=items[items.length-1];
-      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
-      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
-    };
-    document.addEventListener("keydown",onKeyDown);
-    return()=>{document.removeEventListener("keydown",onKeyDown);previous?.focus?.();};
-  },[]);
-  return dialogRef;
-}
-
 
 // ── Supabase API ────────────────────────────────────────────────
-function makeApi(url, key, accessToken, userId) {
+function makeApi(url, key) {
   const base = url.replace(/\/$/,'')+"/rest/v1";
-  const H = {"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+accessToken};
-  const ok = async r => { if(!r.ok){ let msg; try{msg=(await r.json()).message;}catch{msg=r.statusText;} throw new Error(msg||`HTTP ${r.status}`); } };
+  const H = {"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key};
+  const ok = async r => { if(!r.ok) throw new Error((await r.json()).message||r.statusText); };
   const withComputed = row => ({
     ...row,
     final_price:Math.max(0,(+row.price_before_disc||0)-(+row.discount||0)),
@@ -86,12 +54,11 @@ function makeApi(url, key, accessToken, userId) {
     return clean;
   };
   const writeSession = async (method, path, row) => {
-    const body={...row,user_id:userId};
-    let r=await fetch(`${base}/${TABLE}${path}`,{method,headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(withComputed(body))});
+    let r=await fetch(`${base}/${TABLE}${path}`,{method,headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(withComputed(row))});
     if(!r.ok){
       const msg=await r.text();
       if(/generated column|cannot insert|cannot update|final_price|baht_per_kwh/i.test(msg)){
-        r=await fetch(`${base}/${TABLE}${path}`,{method,headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(stripComputed(body))});
+        r=await fetch(`${base}/${TABLE}${path}`,{method,headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(stripComputed(row))});
       } else {
         throw new Error(msg);
       }
@@ -120,10 +87,10 @@ function makeApi(url, key, accessToken, userId) {
       return r.json();
     },
     async upsertRate(station, data){
-      const post = body => fetch(`${base}/${RTABLE}?on_conflict=user_id,station`,{method:"POST",headers:{...H,"Prefer":"return=representation,resolution=merge-duplicates"},body:JSON.stringify(body)});
-      let r=await post({user_id:userId,station,...data});
+      const post = body => fetch(`${base}/${RTABLE}?on_conflict=station`,{method:"POST",headers:{...H,"Prefer":"return=representation,resolution=merge-duplicates"},body:JSON.stringify(body)});
+      let r=await post({station,...data});
       if(!r.ok && ("color" in data || "abbr" in data)){
-        const fallback={user_id:userId,station,...data};
+        const fallback={station,...data};
         delete fallback.color; delete fallback.abbr;
         r=await post(fallback);
       }
@@ -133,6 +100,32 @@ function makeApi(url, key, accessToken, userId) {
       const r=await fetch(`${base}/${RTABLE}?station=eq.${encodeURIComponent(station)}`,{method:"DELETE",headers:H});
       await ok(r);
     },
+  };
+}
+
+// ── Backend proxy API ───────────────────────────────────────────
+function makeProxyApi(){
+  const ok = async r => {
+    if(!r.ok){
+      const txt = await r.text();
+      if(txt.trim().startsWith('<')){
+        throw new Error(`เซิร์ฟเวอร์ตอบสนองผิดปกติ (${r.status} ${r.statusText})`);
+      }
+      let msg;
+      try{ const j=JSON.parse(txt); msg=j.error||j.message||r.statusText; }
+      catch{ msg=txt||r.statusText; }
+      throw new Error(msg);
+    }
+  };
+  return {
+    async fetchAll(){ const r = await fetch('/api/charges'); await ok(r); return r.json(); },
+    async insert(row){ const r=await fetch('/api/charges',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}); await ok(r); return r.json(); },
+    async update(id,row){ const r=await fetch(`/api/charges/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}); await ok(r); return r.json(); },
+    async remove(id){ const r=await fetch(`/api/charges/${id}`,{method:'DELETE'}); await ok(r); },
+    async ping(){ const r=await fetch('/healthz'); await ok(r); return true; },
+    async fetchRates(){ const r=await fetch('/api/rates'); if(!r.ok) return null; return r.json(); },
+    async upsertRate(station,data){ const body={station,...data}; const r=await fetch('/api/rates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); await ok(r); },
+    async deleteRate(station){ const r=await fetch(`/api/rates/${encodeURIComponent(station)}`,{method:'DELETE'}); await ok(r); },
   };
 }
 
@@ -159,7 +152,6 @@ const I={
 const SQL=`-- 1) ตารางบันทึกการชาร์จ
 create table charging_sessions (
   id                bigint generated always as identity primary key,
-  user_id           uuid          not null default auth.uid() references auth.users(id) on delete cascade,
   date              date          not null,
   station           text          not null,
   trip              text,
@@ -174,22 +166,18 @@ create table charging_sessions (
                      then (price_before_disc - discount) / kwh
                      else 0 end) stored,
   rate_snapshot     jsonb,         -- snapshot ราคา ณ วันที่ชาร์จ
-  created_at        timestamptz default now(),
-  constraint charging_sessions_peak_type_check check (peak_type is null or peak_type in ('on_peak','off_peak')),
-  constraint charging_sessions_kwh_check check (kwh > 0),
-  constraint charging_sessions_price_check check (price_before_disc >= 0),
-  constraint charging_sessions_discount_check check (discount >= 0 and discount <= price_before_disc)
+  created_at        timestamptz default now()
 );
-create index charging_sessions_user_date_idx on charging_sessions(user_id, date desc);
 alter table charging_sessions enable row level security;
-create policy "users manage own charging sessions" on charging_sessions
-  for all to authenticated
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+-- ⚠️ policy นี้เปิดให้ทุกคนที่รู้ anon key เข้าถึงได้
+-- สำหรับใช้ส่วนตัว ควรเพิ่ม Supabase Auth และเปลี่ยนเป็น:
+--   using (auth.uid() = user_id) with check (auth.uid() = user_id)
+create policy "allow all" on charging_sessions
+  for all using (true) with check (true);
 
 -- 2) ตารางราคาสถานี (admin แก้ได้)
 create table station_rates (
-  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  station     text not null,
+  station     text primary key,
   rate_type   text not null,       -- 'peak' | 'flat'
   on_peak     numeric(10,2),
   off_peak    numeric(10,2),
@@ -198,40 +186,54 @@ create table station_rates (
   flat        numeric(10,2),
   color       text,
   abbr        text,
-  updated_at  timestamptz default now(),
-  constraint station_rates_type_check check (rate_type in ('flat','peak')),
-  constraint station_rates_values_check check (
-    (rate_type = 'flat' and flat >= 0)
-    or (rate_type = 'peak' and on_peak >= 0 and off_peak >= 0)
-  ),
-  primary key (user_id, station)
+  updated_at  timestamptz default now()
 );
 alter table station_rates add column if not exists color text;
 alter table station_rates add column if not exists abbr text;
 alter table station_rates enable row level security;
-create policy "users manage own station rates" on station_rates
-  for all to authenticated
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);`;
+create policy "allow all" on station_rates
+  for all using (true) with check (true);`;
 
 // ── Auth ─────────────────────────────────────────────────────────
-function LoginScreen({ supabase }) {
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [err,  setErr]  = useState("");
-  const [busy, setBusy] = useState(false);
-  const emailRef = useRef(null);
+const AUTH_KEY    = "ev_auth_hash";
+const SESSION_KEY = "ev_authed";
 
-  useEffect(() => { emailRef.current?.focus(); }, []);
+async function hashPin(pin) {
+  const data = new TextEncoder().encode("chargenote:" + pin);
+  const buf  = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+const isSessionActive = () => sessionStorage.getItem(SESSION_KEY) === "1";
+const setSession      = () => sessionStorage.setItem(SESSION_KEY, "1");
+const clearSession    = () => sessionStorage.removeItem(SESSION_KEY);
+const getStoredHash   = () => localStorage.getItem(AUTH_KEY);
+const setStoredHash   = h  => localStorage.setItem(AUTH_KEY, h);
+
+function LoginScreen({ onAuth }) {
+  const hasPin = !!getStoredHash();
+  const [pin, setPin]         = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr]         = useState("");
+  const [busy, setBusy]       = useState(false);
+  const pinRef = useRef(null);
+
+  useEffect(() => { pinRef.current?.focus(); }, []);
 
   const submit = async () => {
-    if (!email || !password) { setErr("กรุณากรอก Email และ Password"); return; }
+    if (!pin) { setErr("กรุณากรอก PIN"); return; }
     setBusy(true); setErr("");
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email:email.trim(), password });
-      if(error) throw error;
-    } catch (e) {
-      setErr("Email หรือ Password ไม่ถูกต้อง");
-      setPassword("");
+      if (!hasPin) {
+        if (pin.length < 4)           { setErr("PIN ต้องมีอย่างน้อย 4 ตัว"); return; }
+        if (pin !== confirm)           { setErr("PIN ไม่ตรงกัน กรุณากรอกใหม่"); return; }
+        setStoredHash(await hashPin(pin));
+        setSession(); onAuth();
+      } else {
+        const h = await hashPin(pin);
+        if (h === getStoredHash()) { setSession(); onAuth(); }
+        else { setErr("PIN ไม่ถูกต้อง"); setPin(""); }
+      }
     } finally { setBusy(false); }
   };
 
@@ -239,53 +241,51 @@ function LoginScreen({ supabase }) {
 
   return (
     <div className="auth-scrim">
-        <form className="auth-card" onSubmit={e=>{e.preventDefault();submit();}}>
+      <div className="auth-card">
         <div className="logo auth-logo">{I.bolt}</div>
-        <h2>เข้าสู่ระบบ</h2>
-        <p>กรอก Email และ Password เพื่อเปิดแอป</p>
+        <h2>{hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN ครั้งแรก"}</h2>
+        <p>{hasPin ? "กรอก PIN เพื่อเปิดแอป" : "ตั้ง PIN สำหรับป้องกันข้อมูล (ตัวเลขหรือตัวอักษร)"}</p>
         <div className="auth-fields">
           <input
-            ref={emailRef}
-            type="email"
-            className="auth-input"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={onKey}
-            autoComplete="email"
-            aria-label="Email"
-            style={{letterSpacing:"normal",textAlign:"left"}}
-          />
-          <input
+            ref={pinRef}
             type="password"
             className="auth-input"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
+            placeholder={hasPin ? "PIN" : "PIN ใหม่ (อย่างน้อย 4 ตัว)"}
+            value={pin}
+            onChange={e => setPin(e.target.value)}
             onKeyDown={onKey}
             autoComplete="current-password"
-            aria-label="Password"
-            style={{textAlign:"left"}}
           />
+          {!hasPin && (
+            <input
+              type="password"
+              className="auth-input"
+              placeholder="ยืนยัน PIN"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              onKeyDown={onKey}
+              autoComplete="new-password"
+            />
+          )}
         </div>
-        {err && <div className="auth-err" role="alert">⚠ {err}</div>}
-        <button type="submit" className="btn btn-primary auth-btn" disabled={busy}>
-          {busy ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
+        {err && <div className="auth-err">⚠ {err}</div>}
+        <button className="btn btn-primary auth-btn" onClick={submit} disabled={busy}>
+          {busy ? "กำลังตรวจสอบ…" : hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN และเข้าสู่ระบบ"}
         </button>
-      </form>
+      </div>
     </div>
   );
 }
 
 // ── Setup ───────────────────────────────────────────────────────
-function SetupPanel({ onSave, accessToken, userId }) {
+function SetupPanel({ onSave }) {
   const [url,setUrl]=useState(""); const [key,setKey]=useState("");
   const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [sql,setSql]=useState(false);
   const test=async()=>{
     if(!url||!key){ setErr("กรุณากรอก URL และ Key"); return; }
     setBusy(true);setErr("");
     try{
-      await makeApi(url.trim(),key.trim(),accessToken,userId).ping();
+      await makeApi(url.trim(),key.trim()).ping();
       onSave(url.trim(),key.trim());
     }catch(e){ setErr("เชื่อมต่อไม่ได้: "+e.message); }
     setBusy(false);
@@ -299,13 +299,13 @@ function SetupPanel({ onSave, accessToken, userId }) {
       </div>
       <div className="setup-grid">
         <div className="field" style={{gridColumn:"1/-1"}}>
-          <label htmlFor="setup-url">Project URL</label>
-          <input id="setup-url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://xxxxxxxxxxxx.supabase.co"/>
+          <label>Project URL</label>
+          <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://xxxxxxxxxxxx.supabase.co"/>
           <span className="hint">Settings → API → Project URL</span>
         </div>
         <div className="field" style={{gridColumn:"1/-1"}}>
-          <label htmlFor="setup-key">anon / public Key</label>
-          <input id="setup-key" value={key} onChange={e=>setKey(e.target.value)} placeholder="eyJhbGci…" type="password"/>
+          <label>anon / public Key</label>
+          <input value={key} onChange={e=>setKey(e.target.value)} placeholder="eyJhbGci…" type="password"/>
           <span className="hint">Settings → API → anon public</span>
         </div>
       </div>
@@ -387,7 +387,7 @@ function StatCards({entries,allEntries}){
     const totK=sum(entries,"kwh"),totC=sum(entries,"final_price");
     const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
     const now=sorted.length?sorted[0].date.slice(0,7):mKey(new Date().toISOString());
-    const prev=previousMonthKey(now);
+    const prev=(()=>{const d=new Date(now+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
     const pm=entries.filter(e=>e.date.startsWith(prev));
     const pmK=sum(pm,"kwh"),pmC=sum(pm,"final_price");
     const pct=(a,b)=>b?((a-b)/b)*100:null;
@@ -464,12 +464,7 @@ function ChartPanel({entries,monthFilter,setMonthFilter}){
         {data.map(d=>{
           const act=monthFilter===d.key,dim=monthFilter&&monthFilter!==d.key;
           return(
-            <div key={d.key} className={"bar-wrap clickable "+(act?"active ":"")+(dim?"dim ":"")}
-              role="button" tabIndex="0" aria-pressed={act}
-              aria-label={`${mLbl(d.key)} ${fmt(val(d))}`}
-              onClick={()=>setMonthFilter(monthFilter===d.key?null:d.key)}
-              onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setMonthFilter(monthFilter===d.key?null:d.key);}}}
-              title={`${mLbl(d.key)} · ${fmt(val(d))}`}>
+            <div key={d.key} className={"bar-wrap clickable "+(act?"active ":"")+(dim?"dim ":"")} onClick={()=>setMonthFilter(monthFilter===d.key?null:d.key)} title={`${mLbl(d.key)} · ${fmt(val(d))}`}>
               <div className="bar-amount">{fmt(val(d))}</div>
               <div className="bar-stack" style={{height:(val(d)/max*100)+"%"}}><span className="bar-seg solid"/></div>
               <div className="bar-label">{mLbl(d.key)}</div>
@@ -617,18 +612,19 @@ function LineChart({data,color="#6CAE76",h=200}){
 }
 
 // ── Expense Page ─────────────────────────────────────────────────
-function ExpensePage({entries,rates,initialBudget,onBudgetSave}){
+const BUDGET_KEY="ev_budget";
+function ExpensePage({entries,rates}){
   const now=new Date();
   const [subTab,setSubTab]=useState("ภาพรวม");
   const years=useMemo(()=>[...new Set(entries.map(e=>+e.date.slice(0,4)))].sort((a,b)=>b-a),[entries]);
   const [yr,setYr]=useState(()=>now.getFullYear());
   const [mo,setMo]=useState(()=>now.getMonth()+1);
-  const [budget,setBudget]=useState(()=>initialBudget||0);
+  const [budget,setBudget]=useState(()=>+localStorage.getItem(BUDGET_KEY)||0);
   const [editBudget,setEditBudget]=useState(false);
   const [budgetInput,setBudgetInput]=useState("");
 
   const monthKey=`${yr}-${String(mo).padStart(2,"0")}`;
-  const prevKey=previousMonthKey(monthKey);
+  const prevKey=(()=>{const d=new Date(monthKey+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
   const mE=useMemo(()=>entries.filter(e=>e.date.startsWith(monthKey)),[entries,monthKey]);
   const pE=useMemo(()=>entries.filter(e=>e.date.startsWith(prevKey)),[entries,prevKey]);
   const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
@@ -709,7 +705,6 @@ function ExpensePage({entries,rates,initialBudget,onBudgetSave}){
         <p style={{margin:0,fontSize:13,color:"var(--ink-3)"}}>วิเคราะห์และจัดการค่าใช้จ่ายในการชาร์จ</p>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select className="field input" style={{fontSize:13,padding:"6px 10px",borderRadius:8,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer"}}
-            aria-label="เลือกเดือนค่าใช้จ่าย"
             value={monthKey} onChange={e=>{const[y,m]=e.target.value.split("-");setYr(+y);setMo(+m);}}>
             {monthOpts.map(o=><option key={o.k} value={o.k}>{o.lbl}</option>)}
           </select>
@@ -785,7 +780,7 @@ function ExpensePage({entries,rates,initialBudget,onBudgetSave}){
             {editBudget&&(
               <div style={{display:"flex",gap:6,marginBottom:12}}>
                 <input type="number" value={budgetInput} onChange={e=>setBudgetInput(e.target.value)} style={{flex:1,padding:"6px 8px",borderRadius:8,border:"1px solid var(--line)",fontFamily:"inherit",fontSize:13}} placeholder="งบประมาณ (฿)"/>
-                <button className="btn btn-primary" style={{padding:"6px 10px",fontSize:12}} onClick={()=>{const v=+budgetInput;if(v>=0){setBudget(v);onBudgetSave?.(v);}setEditBudget(false);}}>บันทึก</button>
+                <button className="btn btn-primary" style={{padding:"6px 10px",fontSize:12}} onClick={()=>{const v=+budgetInput;if(v>=0){localStorage.setItem(BUDGET_KEY,v);setBudget(v);}setEditBudget(false);}}>บันทึก</button>
               </div>
             )}
             {budget>0?(
@@ -924,12 +919,9 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
     return[...r].sort((a,b)=>{const va=a[key]??0,vb=b[key]??0;if(va<vb)return-sgn;if(va>vb)return sgn;return 0;});
   },[entries,q,filter,sort,monthFilter]);
   const setK=k=>setSort(s=>s.key===k?{key:k,dir:s.dir==="asc"?"desc":"asc"}:{key:k,dir:"desc"});
-  const Hdr=({label,k,align="left",className=""})=>(
-    <th className={(sort.key===k?"sorted ":"")+(align==="right"?"num ":"")+className}
-      aria-sort={sort.key===k?(sort.dir==="asc"?"ascending":"descending"):"none"}>
-      <button className="sortable-button" onClick={()=>setK(k)}>
-        {label}<span className="sort-ind" aria-hidden="true">{sort.key===k?(sort.dir==="asc"?"▲":"▼"):"▲▼"}</span>
-      </button>
+  const Hdr=({label,k,align="left"})=>(
+    <th className={(sort.key===k?"sorted ":"")+(align==="right"?"num":"")} onClick={()=>setK(k)}>
+      {label}<span className="sort-ind">{sort.key===k?(sort.dir==="asc"?"▲":"▼"):"▲▼"}</span>
     </th>
   );
   return(
@@ -948,7 +940,7 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
               <button key={f} className={filter===f?"on":""} onClick={()=>setFilter(f)}>{f}</button>
             ))}
           </div>
-          <div className="search">{I.search}<input aria-label="ค้นหาสถานีหรือทริป" placeholder="ค้นหาสถานี / ทริป…" value={q} onChange={e=>setQ(e.target.value)}/></div>
+          <div className="search">{I.search}<input placeholder="ค้นหาสถานี / ทริป…" value={q} onChange={e=>setQ(e.target.value)}/></div>
         </div>
       </div>
       {loading?<div className="empty"><div className="spinner"/><div style={{marginTop:12}}>กำลังโหลด…</div></div>
@@ -960,8 +952,8 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
               <Hdr label="วันที่" k="date"/>
               <Hdr label="สถานี" k="station"/>
               <Hdr label="KWH" k="kwh" align="right"/>
-              <Hdr label="ราคา/KWH" k="baht_per_kwh" align="right" className="optional-column"/>
-              <Hdr label="ส่วนลด" k="discount" align="right" className="optional-column"/>
+              <Hdr label="ราคา/KWH" k="baht_per_kwh" align="right"/>
+              <Hdr label="ส่วนลด" k="discount" align="right"/>
               <Hdr label="ค่าชาร์จ" k="final_price" align="right"/>
               <th style={{width:80}}></th>
             </tr></thead>
@@ -978,12 +970,12 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
                       </div>
                     </td>
                     <td className="num">{NUM(e.kwh,2)}</td>
-                    <td className="num optional-column">{NUM(e.baht_per_kwh,2)}</td>
-                    <td className="num optional-column" style={{color:+e.discount>0?"var(--leaf-2)":"var(--muted)"}}>{+e.discount>0?"−"+THB(e.discount):"—"}</td>
+                    <td className="num">{NUM(e.baht_per_kwh,2)}</td>
+                    <td className="num" style={{color:+e.discount>0?"var(--leaf-2)":"var(--muted)"}}>{+e.discount>0?"−"+THB(e.discount):"—"}</td>
                     <td className="num" style={{fontWeight:600,color:"var(--ink)"}}>{THB(e.final_price)}</td>
                     <td><div className="row-actions">
-                      <button className="icon-btn" aria-label={`แก้ไขรายการ ${e.station} ${dLbl(e.date)}`} onClick={()=>onEdit(e)}>{I.edit}</button>
-                      <button className="icon-btn danger" aria-label={`ลบรายการ ${e.station} ${dLbl(e.date)}`} onClick={()=>onDelete(e)}>{I.trash}</button>
+                      <button className="icon-btn" onClick={()=>onEdit(e)}>{I.edit}</button>
+                      <button className="icon-btn danger" onClick={()=>onDelete(e)}>{I.trash}</button>
                     </div></td>
                   </tr>
                 );
@@ -998,8 +990,7 @@ function LogTable({entries,rates,onEdit,onDelete,monthFilter,setMonthFilter,load
 
 // ── Entry Modal ─────────────────────────────────────────────────
 function EntryModal({entry,rates,onClose,onSave,saving}){
-  const dialogRef=useDialog(onClose);
-  const today=getLocalDateInput();
+  const today=new Date().toISOString().slice(0,10);
   const initStation=entry?.station||Object.keys(rates)[0]||"PTT";
   const [form,setForm]=useState({
     date:entry?.date||today,
@@ -1045,14 +1036,14 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
   const finalPrice=Math.max(0,(+form.price_before_disc||0)-(+form.discount||0));
   const bahtPerKwh=+form.kwh>0?finalPrice/(+form.kwh):0;
   const discountErr=+form.discount>0&&+form.discount>(+form.price_before_disc||0);
-  const valid=validateEntryForm(form,isPeak);
+  const valid=form.date&&form.station&&+form.price_before_disc>=0&&+form.kwh>=0&&(!isPeak||form.peak_type)&&!discountErr;
 
   const handleSave=()=>{
     if(!valid)return;
     // build snapshot
     const snap=stationRate?{...stationRate,captured_at:new Date().toISOString()}:null;
     onSave({
-      date:form.date, station:form.station, trip:form.trip.trim()||null,
+      date:form.date, station:form.station, station_id:stationRate?.id||null, trip:form.trip||null,
       peak_type:form.peak_type||null,
       price_before_disc:+form.price_before_disc,
       kwh:+form.kwh, discount:+form.discount||0,
@@ -1062,19 +1053,19 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
 
   return(
     <div className="scrim" onClick={onClose}>
-      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title" onClick={e=>e.stopPropagation()}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
         <div className="modal-hd">
-          <h2 id="entry-modal-title">{entry?"แก้ไขรายการ":"เพิ่มรายการชาร์จ"}</h2>
+          <h2>{entry?"แก้ไขรายการ":"เพิ่มรายการชาร์จ"}</h2>
           <p>ราคาจะถูก snapshot ไว้อัตโนมัติ ณ วันที่บันทึก</p>
         </div>
         <div className="modal-body">
           <div className="field">
-            <label htmlFor="entry-date">วันที่</label>
-            <input id="entry-date" type="date" value={form.date} onChange={e=>set("date",e.target.value)}/>
+            <label>วันที่</label>
+            <input type="date" value={form.date} onChange={e=>set("date",e.target.value)}/>
           </div>
           <div className="field">
-            <label htmlFor="entry-station">สถานี</label>
-            <select id="entry-station" value={form.station} onChange={e=>set("station",e.target.value)}>
+            <label>สถานี</label>
+            <select value={form.station} onChange={e=>set("station",e.target.value)}>
               {Object.keys(rates).map(s=><option key={s}>{s}</option>)}
             </select>
           </div>
@@ -1083,14 +1074,14 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
           {isPeak&&(
             <div className="field full">
               <label>ช่วงเวลา</label>
-              <div className="peak-selector" role="group" aria-label="เลือกช่วงเวลาชาร์จ">
-                <button type="button" aria-pressed={form.peak_type==="on_peak"} className={"peak-btn "+(form.peak_type==="on_peak"?"on-sel":"")} onClick={()=>selectPeak("on_peak")}>
+              <div className="peak-selector">
+                <button type="button" className={"peak-btn "+(form.peak_type==="on_peak"?"on-sel":"")} onClick={()=>selectPeak("on_peak")}>
                   <span className="pb-icon">🌞</span>
                   <span className="pb-label">On Peak</span>
                   <span className="pb-price">฿{NUM(stationRate.on_peak,2)}/kWh</span>
                   <span className="pb-time">{stationRate.on_time||""}</span>
                 </button>
-                <button type="button" aria-pressed={form.peak_type==="off_peak"} className={"peak-btn "+(form.peak_type==="off_peak"?"off-sel":"")} onClick={()=>selectPeak("off_peak")}>
+                <button type="button" className={"peak-btn "+(form.peak_type==="off_peak"?"off-sel":"")} onClick={()=>selectPeak("off_peak")}>
                   <span className="pb-icon">🌙</span>
                   <span className="pb-label">Off Peak</span>
                   <span className="pb-price">฿{NUM(stationRate.off_peak,2)}/kWh</span>
@@ -1113,26 +1104,26 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
           )}
 
           <div className="field full">
-            <label htmlFor="entry-trip">ทริป (ไม่บังคับ)</label>
-            <input id="entry-trip" value={form.trip} onChange={e=>set("trip",e.target.value)} placeholder="เช่น เชียงใหม่, หัวหิน…"/>
+            <label>ทริป (ไม่บังคับ)</label>
+            <input value={form.trip} onChange={e=>set("trip",e.target.value)} placeholder="เช่น เชียงใหม่, หัวหิน…"/>
           </div>
           <div className="field">
-            <label htmlFor="entry-kwh">พลังงาน (kWh)</label>
-            <input id="entry-kwh" type="number" step="0.01" min="0.01" value={form.kwh} onChange={e=>set("kwh",e.target.value)} placeholder="0.00"/>
+            <label>พลังงาน (kWh)</label>
+            <input type="number" step="0.01" min="0" value={form.kwh} onChange={e=>set("kwh",e.target.value)} placeholder="0.00"/>
           </div>
           <div className="field">
-            <label htmlFor="entry-discount">ส่วนลด (฿)</label>
-            <input id="entry-discount" type="number" step="0.01" min="0" value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0.00" aria-invalid={discountErr} style={discountErr?{borderColor:"var(--danger)"}:{}}/>
+            <label>ส่วนลด (฿)</label>
+            <input type="number" step="0.01" min="0" value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0.00" style={discountErr?{borderColor:"var(--danger)"}:{}}/>
             {discountErr?<span className="hint" style={{color:"#A85B5B"}}>⚠ ส่วนลดมากกว่าราคาก่อนลด</span>:<span className="hint">โปรโมชั่น / สมาชิก</span>}
           </div>
           <div className="field">
-            <label htmlFor="entry-price">ราคาก่อนลด (฿)</label>
-            <input id="entry-price" type="number" step="0.01" min="0" value={form.price_before_disc} onChange={e=>set("price_before_disc",e.target.value)} placeholder="คำนวณอัตโนมัติ"/>
+            <label>ราคาก่อนลด (฿)</label>
+            <input type="number" step="0.01" min="0" value={form.price_before_disc} onChange={e=>set("price_before_disc",e.target.value)} placeholder="คำนวณอัตโนมัติ"/>
             <span className="hint">kWh × ราคา — แก้ได้ถ้าไม่ตรง</span>
           </div>
           <div className="field computed">
-            <label htmlFor="entry-final-price">ชำระจริง</label>
-            <input id="entry-final-price" value={THB(finalPrice)} readOnly/>
+            <label>ชำระจริง</label>
+            <input value={THB(finalPrice)} readOnly/>
             <span className="hint">{NUM(bahtPerKwh,2)} ฿/kWh</span>
           </div>
 
@@ -1166,11 +1157,9 @@ function AdminPanel({rates,setRates,api}){
   const [saving,setSaving]=useState(false);
   const [saved,setSaved]=useState(false);
   const [saveErr,setSaveErr]=useState("");
-  const [pendingDelete,setPendingDelete]=useState(null);
   const [draft,setDraft]=useState({station:"",type:"flat",flat:"7.50",on_peak:"8.00",off_peak:"5.50",on_time:"09:00–22:00",off_time:"22:00–09:00",color:"#6CAE76",abbr:""});
   const [editKey,setEditKey]=useState(null);
   const [editDraft,setEditDraft]=useState({name:"",abbr:"",color:""});
-  const [removedStations,setRemovedStations]=useState([]);
   const isDirty=JSON.stringify(local)!==JSON.stringify(rates);
 
   useEffect(()=>{ setLocal(JSON.parse(JSON.stringify(rates))); },[rates]);
@@ -1183,20 +1172,10 @@ function AdminPanel({rates,setRates,api}){
   const applyEdit=()=>{
     const newName=editDraft.name.trim();
     if(!newName) return;
-    if(newName!==editKey&&local[newName]){
-      setSaveErr("มีสถานีชื่อนี้แล้ว");
-      return;
-    }
-    if(newName!==editKey){
-      setRemovedStations(items=>items.includes(editKey)?items:[...items,editKey]);
-    }
     setLocal(r=>{
       const next={...r};
       const data={...next[editKey],abbr:editDraft.abbr.toUpperCase().slice(0,3),color:editDraft.color};
-      if(newName!==editKey){
-        delete next[editKey];
-        next[newName]=data;
-      }
+      if(newName!==editKey){ delete next[editKey]; next[newName]=data; }
       else { next[editKey]=data; }
       return next;
     });
@@ -1224,16 +1203,15 @@ function AdminPanel({rates,setRates,api}){
     setSaveErr("");
   };
 
-  const deleteStation=(station)=>setPendingDelete(station);
-
-  const confirmDelete=async()=>{
-    const station=pendingDelete;
-    setPendingDelete(null);
-    if(!api){ setSaveErr("กรุณาเชื่อมต่อ Supabase ก่อนลบสถานี เพื่อให้ข้อมูลออนไลน์"); return; }
+  const deleteStation=async(station)=>{
+    if(!confirm(`ลบสถานี ${station}? รายการชาร์จเก่าจะยังอยู่ แต่สถานีนี้จะหายจากตัวเลือกใหม่`)) return;
+    if(!api){
+      setSaveErr("กรุณาเชื่อมต่อ Supabase ก่อนลบสถานี เพื่อให้ข้อมูลออนไลน์");
+      return;
+    }
     setSaving(true);
     try{
       await api.deleteRate(station);
-      setRemovedStations(items=>items.filter(item=>item!==station));
       setLocal(r=>{ const n={...r}; delete n[station]; return n; });
       setRates(r=>{ const n={...r}; delete n[station]; saveRates(n); return n; });
       setSaved(true); setSaveErr(""); setTimeout(()=>setSaved(false),2000);
@@ -1258,11 +1236,7 @@ function AdminPanel({rates,setRates,api}){
           abbr:data.abbr||null,
         });
       }
-      for(const station of removedStations){
-        await api.deleteRate(station);
-      }
       saveRates(local); setRates(local);
-      setRemovedStations([]);
       setSaved(true); setSaveErr(""); setTimeout(()=>setSaved(false),2000);
     }catch(e){ setSaveErr("บันทึกไม่ได้: "+e.message); }
     finally{ setSaving(false); }
@@ -1281,49 +1255,40 @@ function AdminPanel({rates,setRates,api}){
       </div>
       {isDirty&&<div style={{background:"#FFF3CD",border:"1px solid #E8A33A",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#9A6400"}}>⚠ มีการเปลี่ยนแปลงที่ยังไม่บันทึก</div>}
       {saveErr&&<div className="err-bar" style={{marginBottom:14}}><span>⚠️ {saveErr}</span><button onClick={()=>setSaveErr("")}>×</button></div>}
-      {pendingDelete&&(
-        <div style={{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:10,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-          <div style={{fontSize:13,color:"#991B1B"}}>ลบสถานี <strong>{pendingDelete}</strong>? รายการชาร์จเก่าจะยังอยู่ แต่สถานีนี้จะหายจากตัวเลือกใหม่</div>
-          <div style={{display:"flex",gap:8,flexShrink:0}}>
-            <button className="btn btn-ghost" style={{fontSize:12,padding:"4px 12px"}} onClick={()=>setPendingDelete(null)}>ยกเลิก</button>
-            <button className="btn btn-danger" style={{fontSize:12,padding:"4px 12px"}} onClick={confirmDelete}>ลบ</button>
-          </div>
-        </div>
-      )}
       <div className="add-station-card">
         <div className="field station-name">
           <label>เพิ่มสถานี</label>
-          <input aria-label="ชื่อสถานีใหม่" value={draft.station} onChange={e=>setDraft(d=>({...d,station:e.target.value,abbr:d.abbr||makeAbbr(e.target.value)}))} placeholder="เช่น Altervim, Tesla Supercharger"/>
+          <input value={draft.station} onChange={e=>setDraft(d=>({...d,station:e.target.value,abbr:d.abbr||makeAbbr(e.target.value)}))} placeholder="เช่น Altervim, Tesla Supercharger"/>
         </div>
         <div className="field compact">
           <label>ประเภท</label>
-          <select aria-label="ประเภทสถานี" value={draft.type} onChange={e=>setDraft(d=>({...d,type:e.target.value}))}>
+          <select value={draft.type} onChange={e=>setDraft(d=>({...d,type:e.target.value}))}>
             <option value="flat">Flat</option>
             <option value="peak">On/Off Peak</option>
           </select>
         </div>
         <div className="field compact">
           <label>ตัวย่อ</label>
-          <input aria-label="ตัวย่อสถานี" value={draft.abbr} onChange={e=>setDraft(d=>({...d,abbr:e.target.value.toUpperCase()}))} placeholder="EV" maxLength="3"/>
+          <input value={draft.abbr} onChange={e=>setDraft(d=>({...d,abbr:e.target.value.toUpperCase()}))} placeholder="EV" maxLength="3"/>
         </div>
         <div className="field compact">
           <label>สี</label>
-          <input aria-label="สีสถานี" type="color" value={draft.color} onChange={e=>setDraft(d=>({...d,color:e.target.value}))}/>
+          <input type="color" value={draft.color} onChange={e=>setDraft(d=>({...d,color:e.target.value}))}/>
         </div>
         {draft.type==="flat"?(
           <div className="field compact">
             <label>ราคา</label>
-            <input aria-label="ราคา flat rate" type="number" step="0.01" min="0" value={draft.flat} onChange={e=>setDraft(d=>({...d,flat:e.target.value}))}/>
+            <input type="number" step="0.01" min="0" value={draft.flat} onChange={e=>setDraft(d=>({...d,flat:e.target.value}))}/>
           </div>
         ):(
           <>
             <div className="field compact">
               <label>On</label>
-              <input aria-label="ราคา on peak" type="number" step="0.01" min="0" value={draft.on_peak} onChange={e=>setDraft(d=>({...d,on_peak:e.target.value}))}/>
+              <input type="number" step="0.01" min="0" value={draft.on_peak} onChange={e=>setDraft(d=>({...d,on_peak:e.target.value}))}/>
             </div>
             <div className="field compact">
               <label>Off</label>
-              <input aria-label="ราคา off peak" type="number" step="0.01" min="0" value={draft.off_peak} onChange={e=>setDraft(d=>({...d,off_peak:e.target.value}))}/>
+              <input type="number" step="0.01" min="0" value={draft.off_peak} onChange={e=>setDraft(d=>({...d,off_peak:e.target.value}))}/>
             </div>
           </>
         )}
@@ -1381,8 +1346,8 @@ function AdminPanel({rates,setRates,api}){
                 </div>
               )}
               <div style={{display:"flex",gap:4}}>
-                <button className="icon-btn" aria-label={`แก้ไขสถานี ${station}`} onClick={()=>startEdit(station)} title="แก้ไขชื่อ/สี">{I.edit}</button>
-                <button className="icon-btn danger" aria-label={`ลบสถานี ${station}`} onClick={()=>deleteStation(station)} title="ลบสถานี">{I.trash}</button>
+                <button className="icon-btn" onClick={()=>startEdit(station)} title="แก้ไขชื่อ/สี">{I.edit}</button>
+                <button className="icon-btn danger" onClick={()=>deleteStation(station)} title="ลบสถานี">{I.trash}</button>
               </div>
             </div>
           );
@@ -1395,11 +1360,10 @@ function AdminPanel({rates,setRates,api}){
 // ── Confirm ─────────────────────────────────────────────────────
 function ConfirmDel({entry,rates,onCancel,onConfirm,saving}){
   const s=smeta(entry.station,rates);
-  const dialogRef=useDialog(onCancel);
   return(
     <div className="scrim" onClick={onCancel}>
-      <div ref={dialogRef} className="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="delete-title" onClick={e=>e.stopPropagation()}>
-        <h3 id="delete-title">ลบรายการนี้?</h3>
+      <div className="confirm-box" onClick={e=>e.stopPropagation()}>
+        <h3>ลบรายการนี้?</h3>
         <p>{dLbl(entry.date)} · {s.abbr} {entry.station}{entry.trip?` · ✈ ${entry.trip}`:""}<br/>
           {NUM(entry.kwh,2)} kWh · {THB(entry.final_price)}<br/><br/>การลบไม่สามารถยกเลิกได้
         </p>
@@ -1431,10 +1395,8 @@ class ErrorBoundary extends React.Component {
 
 // ── App ─────────────────────────────────────────────────────────
 function App(){
+  const [authed,setAuthed]   = useState(isSessionActive);
   const [cfg, setCfg]        = useState(loadCfg);
-  const supabase = useMemo(()=>createClient(cfg.url,cfg.key),[cfg.url,cfg.key]);
-  const [session,setSession] = useState(null);
-  const [authReady,setAuthReady] = useState(false);
   const [rates,setRates]     = useState(loadRates);
   const [entries,setEntries] = useState([]);
   const [status,setStatus]   = useState("idle");
@@ -1449,41 +1411,21 @@ function App(){
   const [statYear,setStatYear]   = useState(_now.getFullYear());
   const [statMonth,setStatMonth] = useState(_now.getMonth()+1);
 
-  const api = useMemo(
-    ()=>cfg.url&&cfg.key&&session?.access_token
-      ?makeApi(cfg.url,cfg.key,session.access_token,session.user.id)
-      :null,
-    [cfg.url,cfg.key,session]
-  );
+  const api = useMemo(()=>cfg.url&&cfg.key?makeApi(cfg.url,cfg.key):null,[cfg.url,cfg.key]);
   const hasCfg = !!(cfg.url&&cfg.key);
   const visibleEntries = entries;
 
+  const statYears = useMemo(()=>[...new Set(entries.map(e=>+e.date.slice(0,4)))].sort((a,b)=>b-a),[entries]);
+  const statMonthsInYear = useMemo(()=>new Set(entries.filter(e=>+e.date.slice(0,4)===statYear).map(e=>+e.date.slice(5,7))),[entries,statYear]);
   const yearEntries  = useMemo(()=>statYear===0?entries:entries.filter(e=>+e.date.slice(0,4)===statYear),[entries,statYear]);
-  const statsEntries = useMemo(()=>filterEntriesByPeriod(entries,statYear,statMonth),[entries,statYear,statMonth]);
+  const statsEntries = useMemo(()=>statYear===0||statMonth===0?yearEntries:entries.filter(e=>+e.date.slice(0,4)===statYear&&+e.date.slice(5,7)===statMonth),[entries,statYear,statMonth,yearEntries]);
   const statYearOpts = useMemo(()=>{
     const by={};
     entries.forEach(e=>{const y=+e.date.slice(0,4),m=+e.date.slice(5,7);if(!by[y])by[y]=new Set();by[y].add(m);});
     return Object.entries(by).sort(([a],[b])=>+a-+b).map(([y,ms])=>({year:+y,months:[...ms].sort((a,b)=>a-b)}));
   },[entries]);
+  const MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),1800);};
-
-  useEffect(()=>{
-    let active=true;
-    supabase.auth.getSession().then(({data})=>{
-      if(active){
-        setSession(data.session);
-        setAuthReady(true);
-      }
-    });
-    const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,nextSession)=>{
-      setSession(current=>{
-        if(current?.user?.id!==nextSession?.user?.id) setEntries([]);
-        return nextSession;
-      });
-      setAuthReady(true);
-    });
-    return()=>{active=false;subscription.unsubscribe();};
-  },[supabase]);
 
   const load=useCallback(async()=>{
     if(!api) return;
@@ -1491,7 +1433,7 @@ function App(){
     try{
       const [data,rData]=await Promise.all([api.fetchAll(), api.fetchRates()]);
       setEntries(data);
-      if(rData){
+      if(rData&&rData.length){
         const fromDb={};
         rData.forEach(r=>{ fromDb[r.station]=rateFromDb(r); });
         setRates(fromDb); saveRates(fromDb);
@@ -1518,7 +1460,7 @@ function App(){
         setEntries(es=>[c,...es].sort((a,b)=>b.date.localeCompare(a.date))); showToast("เพิ่มรายการแล้ว");
       }
       setModal(null);
-    }catch(e){setErrMsg(e.message);}
+    }catch(e){setErrMsg(e.message);setStatus("err");}
     finally{setSaving(false);}
   };
 
@@ -1540,7 +1482,6 @@ function App(){
     const c={url,key};
     localStorage.setItem(CFG_KEY,JSON.stringify(c));
     setCfg(c);
-    setSession(null);
   };
 
   const onExport=()=>{
@@ -1552,18 +1493,14 @@ function App(){
     const csv="\uFEFF"+rows.map(r=>r.map(escCsv).join(",")).join("\n");
     const blobUrl=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
     const a=document.createElement("a");
-    a.href=blobUrl; a.download=`ev-log-${getLocalDateInput()}.csv`; a.click();
-    setTimeout(()=>URL.revokeObjectURL(blobUrl), 1000);
+    a.href=blobUrl; a.download=`ev-log-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(blobUrl);
     showToast("ส่งออก CSV แล้ว");
   };
 
-  if (!authReady) return <div className="auth-scrim"><div className="spinner" aria-label="กำลังตรวจสอบ session"/></div>;
-  if (!session) return <LoginScreen supabase={supabase}/>;
+  if (!authed) return <LoginScreen onAuth={()=>setAuthed(true)}/>;
 
-  const handleLogout = async () => {
-    const {error}=await supabase.auth.signOut();
-    if(error) setErrMsg(error.message);
-  };
+  const handleLogout = () => { clearSession(); setAuthed(false); };
 
   const PAGE_TITLE = {สถิติ:"ภาพรวม", รายการ:"การชาร์จ", สถานี:"สถานี", ค่าใช้จ่าย:"ค่าใช้จ่าย"};
 
@@ -1577,10 +1514,10 @@ function App(){
         </div>
 
         <nav className="sidebar-nav">
-          <button aria-current={tab==="สถิติ"?"page":undefined} className={tab==="สถิติ"?"on":""} onClick={()=>setTab("สถิติ")}>{I.home} ภาพรวม</button>
-          <button aria-current={tab==="ค่าใช้จ่าย"?"page":undefined} className={tab==="ค่าใช้จ่าย"?"on":""} onClick={()=>setTab("ค่าใช้จ่าย")}>{I.wallet} ค่าใช้จ่าย</button>
-          <button aria-current={tab==="รายการ"?"page":undefined} className={tab==="รายการ"?"on":""} onClick={()=>setTab("รายการ")}>{I.zap} การชาร์จ</button>
-          <button aria-current={tab==="สถานี"?"page":undefined} className={tab==="สถานี"?"on":""} onClick={()=>setTab("สถานี")}>{I.pin} สถานี</button>
+          <button className={tab==="สถิติ"?"on":""} onClick={()=>setTab("สถิติ")}>{I.home} ภาพรวม</button>
+          <button className={tab==="ค่าใช้จ่าย"?"on":""} onClick={()=>setTab("ค่าใช้จ่าย")}>{I.wallet} ค่าใช้จ่าย</button>
+          <button className={tab==="รายการ"?"on":""} onClick={()=>setTab("รายการ")}>{I.zap} การชาร์จ</button>
+          <button className={tab==="สถานี"?"on":""} onClick={()=>setTab("สถานี")}>{I.pin} สถานี</button>
         </nav>
 
         <div className="sidebar-car">
@@ -1609,10 +1546,10 @@ function App(){
           </div>
 
           {/* Error bar */}
-          {errMsg&&<div className="err-bar" role="alert"><span>⚠️ {errMsg}</span><button aria-label="ปิดข้อความผิดพลาด" onClick={()=>setErrMsg("")}>×</button></div>}
+          {errMsg&&<div className="err-bar"><span>⚠️ {errMsg}</span><button onClick={()=>setErrMsg("")}>×</button></div>}
 
           {/* Setup */}
-          {!hasCfg&&<SetupPanel onSave={onSaveCfg} accessToken={session.access_token} userId={session.user.id}/>}
+          {!hasCfg&&<SetupPanel onSave={onSaveCfg}/>}
 
           {/* สถานี */}
           {tab==="สถานี"&&<AdminPanel rates={rates} setRates={setRates} api={api}/>}
@@ -1623,7 +1560,6 @@ function App(){
               <div className="stat-filter" style={{flexDirection:"row",alignItems:"center",justifyContent:"flex-end",gap:8}}>
                 <select
                   value={statYear===0?"all":statYear}
-                  aria-label="กรองตามปี"
                   onChange={e=>{const v=e.target.value;setStatYear(v==="all"?0:+v);setStatMonth(0);}}
                   style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
                 >
@@ -1634,16 +1570,14 @@ function App(){
                 </select>
                 <select
                   value={statMonth===0?"all":statMonth}
-                  aria-label="กรองตามเดือน"
                   onChange={e=>{const v=e.target.value;setStatMonth(v==="all"?0:+v);}}
                   style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
                 >
                   <option value="all">ทุกเดือน</option>
-                  {(statYear===0
-                    ?[...new Set(statYearOpts.flatMap(o=>o.months))].sort((a,b)=>a-b)
-                    :(statYearOpts.find(o=>o.year===statYear)?.months||[])
-                  ).map(m=>(
-                    <option key={m} value={m}>{MONTHS_FULL[m-1]}</option>
+                  {(statYear===0?statYearOpts.flatMap(o=>o.months.map(m=>({year:o.year,m}))):
+                    (statYearOpts.find(o=>o.year===statYear)?.months||[]).map(m=>({year:statYear,m}))
+                  ).map(({year,m})=>(
+                    <option key={`${year}-${m}`} value={m}>{MONTHS_FULL[m-1]}</option>
                   ))}
                 </select>
               </div>
@@ -1664,7 +1598,7 @@ function App(){
           )}
 
           {/* ค่าใช้จ่าย */}
-          {tab==="ค่าใช้จ่าย"&&<ExpensePage entries={entries} rates={rates} initialBudget={+session?.user?.user_metadata?.ev_budget||0} onBudgetSave={async v=>{await supabase.auth.updateUser({data:{ev_budget:v}});}}/>}
+          {tab==="ค่าใช้จ่าย"&&<ExpensePage entries={entries} rates={rates}/>}
 
           {/* การชาร์จ */}
           {tab==="รายการ"&&(
@@ -1674,11 +1608,11 @@ function App(){
           {/* Modals */}
           {modal&&<EntryModal entry={modal==="new"?null:modal} rates={rates} onClose={()=>setModal(null)} onSave={onSave} saving={saving}/>}
           {confirmDel&&<ConfirmDel entry={confirmDel} rates={rates} onCancel={()=>setDel(null)} onConfirm={onDelConfirm} saving={saving}/>}
-          {toast&&<div className="toast" role="status">✓ {toast}</div>}
+          {toast&&<div className="toast">✓ {toast}</div>}
         </div>
       </div>
     </div>
   );
 }
 
-createRoot(document.getElementById("root")).render(<ErrorBoundary><App/></ErrorBoundary>);
+ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App/></ErrorBoundary>);
