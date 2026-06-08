@@ -1,4 +1,4 @@
-const CACHE = 'chargenote-v1';
+const CACHE = 'chargenote-v2';
 const ASSETS = [
   './',
   './app.jsx',
