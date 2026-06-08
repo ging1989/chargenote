@@ -9,6 +9,7 @@ const SUPABASE_DEFAULT = {
   url: "https://znwhsbjjykkbbgqyoewl.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud2hzYmpqeWtrYmJncXlvZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MDQ0MTQsImV4cCI6MjA5NTE4MDQxNH0.juLswcub25iERIJllOdO_Uf-iicbSnVuuf0FM6xoJ2M",
 };
+const sbClient = supabase.createClient(SUPABASE_DEFAULT.url, SUPABASE_DEFAULT.key);
 
 // ── Storage helpers ─────────────────────────────────────────────
 const loadCfg   = () => { try{ return JSON.parse(localStorage.getItem(CFG_KEY))||SUPABASE_DEFAULT; }catch(e){ return SUPABASE_DEFAULT; } };
@@ -195,45 +196,23 @@ create policy "allow all" on station_rates
   for all using (true) with check (true);`;
 
 // ── Auth ─────────────────────────────────────────────────────────
-const AUTH_KEY    = "ev_auth_hash";
-const SESSION_KEY = "ev_authed";
+function LoginScreen() {
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr]           = useState("");
+  const [busy, setBusy]         = useState(false);
+  const emailRef = useRef(null);
 
-async function hashPin(pin) {
-  const data = new TextEncoder().encode("chargenote:" + pin);
-  const buf  = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-
-const isSessionActive = () => sessionStorage.getItem(SESSION_KEY) === "1";
-const setSession      = () => sessionStorage.setItem(SESSION_KEY, "1");
-const clearSession    = () => sessionStorage.removeItem(SESSION_KEY);
-const getStoredHash   = () => localStorage.getItem(AUTH_KEY);
-const setStoredHash   = h  => localStorage.setItem(AUTH_KEY, h);
-
-function LoginScreen({ onAuth }) {
-  const hasPin = !!getStoredHash();
-  const [pin, setPin]         = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [err, setErr]         = useState("");
-  const [busy, setBusy]       = useState(false);
-  const pinRef = useRef(null);
-
-  useEffect(() => { pinRef.current?.focus(); }, []);
+  useEffect(() => { emailRef.current?.focus(); }, []);
 
   const submit = async () => {
-    if (!pin) { setErr("กรุณากรอก PIN"); return; }
+    if (!email || !password) { setErr("กรุณากรอก Email และ Password"); return; }
     setBusy(true); setErr("");
     try {
-      if (!hasPin) {
-        if (pin.length < 4)           { setErr("PIN ต้องมีอย่างน้อย 4 ตัว"); return; }
-        if (pin !== confirm)           { setErr("PIN ไม่ตรงกัน กรุณากรอกใหม่"); return; }
-        setStoredHash(await hashPin(pin));
-        setSession(); onAuth();
-      } else {
-        const h = await hashPin(pin);
-        if (h === getStoredHash()) { setSession(); onAuth(); }
-        else { setErr("PIN ไม่ถูกต้อง"); setPin(""); }
-      }
+      const { error } = await sbClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    } catch (e) {
+      setErr(e.message === "Invalid login credentials" ? "Email หรือ Password ไม่ถูกต้อง" : e.message);
     } finally { setBusy(false); }
   };
 
@@ -243,34 +222,34 @@ function LoginScreen({ onAuth }) {
     <div className="auth-scrim">
       <div className="auth-card">
         <div className="logo auth-logo">{I.bolt}</div>
-        <h2>{hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN ครั้งแรก"}</h2>
-        <p>{hasPin ? "กรอก PIN เพื่อเปิดแอป" : "ตั้ง PIN สำหรับป้องกันข้อมูล (ตัวเลขหรือตัวอักษร)"}</p>
+        <h2>Charge Note</h2>
+        <p>เข้าสู่ระบบเพื่อดูข้อมูลการชาร์จ</p>
         <div className="auth-fields">
           <input
-            ref={pinRef}
+            ref={emailRef}
+            type="email"
+            className="auth-input"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onKeyDown={onKey}
+            autoComplete="email"
+            style={{letterSpacing:"normal",textAlign:"left"}}
+          />
+          <input
             type="password"
             className="auth-input"
-            placeholder={hasPin ? "PIN" : "PIN ใหม่ (อย่างน้อย 4 ตัว)"}
-            value={pin}
-            onChange={e => setPin(e.target.value)}
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
             onKeyDown={onKey}
             autoComplete="current-password"
+            style={{letterSpacing:"normal",textAlign:"left"}}
           />
-          {!hasPin && (
-            <input
-              type="password"
-              className="auth-input"
-              placeholder="ยืนยัน PIN"
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              onKeyDown={onKey}
-              autoComplete="new-password"
-            />
-          )}
         </div>
         {err && <div className="auth-err">⚠ {err}</div>}
         <button className="btn btn-primary auth-btn" onClick={submit} disabled={busy}>
-          {busy ? "กำลังตรวจสอบ…" : hasPin ? "เข้าสู่ระบบ" : "ตั้ง PIN และเข้าสู่ระบบ"}
+          {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
         </button>
       </div>
     </div>
@@ -1395,7 +1374,8 @@ class ErrorBoundary extends React.Component {
 
 // ── App ─────────────────────────────────────────────────────────
 function App(){
-  const [authed,setAuthed]   = useState(isSessionActive);
+  const [authed,setAuthed]   = useState(false);
+  const [authReady,setAuthReady] = useState(false);
   const [cfg, setCfg]        = useState(loadCfg);
   const [rates,setRates]     = useState(loadRates);
   const [entries,setEntries] = useState([]);
@@ -1410,6 +1390,16 @@ function App(){
   const _now = new Date();
   const [statYear,setStatYear]   = useState(_now.getFullYear());
   const [statMonth,setStatMonth] = useState(_now.getMonth()+1);
+
+  useEffect(()=>{
+    sbClient.auth.getSession().then(({data:{session}})=>{
+      setAuthed(!!session); setAuthReady(true);
+    });
+    const {data:{subscription}}=sbClient.auth.onAuthStateChange((_,session)=>{
+      setAuthed(!!session);
+    });
+    return ()=>subscription.unsubscribe();
+  },[]);
 
   const api = useMemo(()=>cfg.url&&cfg.key?makeApi(cfg.url,cfg.key):null,[cfg.url,cfg.key]);
   const hasCfg = !!(cfg.url&&cfg.key);
@@ -1498,9 +1488,10 @@ function App(){
     showToast("ส่งออก CSV แล้ว");
   };
 
-  if (!authed) return <LoginScreen onAuth={()=>setAuthed(true)}/>;
+  if (!authReady) return <div className="auth-scrim"><div className="spinner"/></div>;
+  if (!authed) return <LoginScreen/>;
 
-  const handleLogout = () => { clearSession(); setAuthed(false); };
+  const handleLogout = () => { sbClient.auth.signOut(); };
 
   const PAGE_TITLE = {สถิติ:"ภาพรวม", รายการ:"การชาร์จ", สถานี:"สถานี", ค่าใช้จ่าย:"ค่าใช้จ่าย"};
 
