@@ -16,8 +16,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 const supabase = createClient(SUPABASE_URL || '', SUPABASE_SERVICE_ROLE_KEY || '');
 
 const path = require('path');
-const distDir = path.join(__dirname, 'dist');
-app.use(express.static(distDir));
+app.use(express.static(__dirname));
 
 async function requireUser(req, res, next) {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -108,7 +107,7 @@ app.delete('/api/rates/:station', async (req, res) => {
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(distDir, 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

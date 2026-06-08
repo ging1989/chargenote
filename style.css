@@ -92,6 +92,7 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:v
 
 /* ── Stats ── */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.stats-5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:17px 18px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;min-height:155px}
 .stat{display:flex;flex-direction:column}
 .stat .lbl{font-size:12px;color:var(--ink-3);font-weight:600}
@@ -102,6 +103,9 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:v
 
 /* ── Panels ── */
 .panels{display:grid;grid-template-columns:1.42fr 1fr;gap:14px;margin-bottom:20px}
+.dash-2col{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;margin-bottom:14px}
+.dash-3col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.dash-2col > *,.dash-3col > *{min-width:0;overflow:hidden}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm);min-height:420px}
 .panel-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .panel h3{margin:0 0 4px;font-size:15px;font-weight:700}
@@ -299,12 +303,16 @@ tbody td.station{color:var(--ink);font-weight:500}
 
   /* ── Stat cards ── */
   .stats{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .stats-5{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
   .stat{padding:13px 14px 14px;min-height:unset}
   .stat .val{font-size:20px}
 
   /* ── Panels ── */
   .panels{gap:10px;margin-bottom:14px}
   .panel{padding:14px;min-height:unset}
+
+  /* ── Dashboard grids → stack on mobile ── */
+  .dash-2col,.dash-3col{grid-template-columns:1fr}
 
   /* ── Stat filter dropdowns ── */
   .stat-filter{flex-direction:row!important;justify-content:flex-end!important;gap:6px!important;margin-bottom:14px}
@@ -332,8 +340,9 @@ tbody td.station{color:var(--ink);font-weight:500}
   /* ── Setup ── */
   .setup-card{padding:18px 16px}
 
-  /* ── Expense 3-col becomes single column ── */
+  /* ── Expense grids → 2-col then 1-col on mobile ── */
   .expense-3col{grid-template-columns:1fr;gap:10px}
+  .exp-4cards{grid-template-columns:1fr 1fr;gap:10px}
 
   /* ── Breakdown donut+list stack on mobile ── */
   .bd-row .name{font-size:14px}
@@ -344,8 +353,10 @@ tbody td.station{color:var(--ink);font-weight:500}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
-/* ── Expense 3-col grid ── */
+/* ── Expense grids ── */
 .expense-3col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px}
+.exp-4cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.exp-4cards > *{min-width:0;overflow:hidden}
 
 /* ── Auth ── */
 .auth-scrim{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:200}

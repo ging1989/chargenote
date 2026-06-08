@@ -551,6 +551,467 @@ function DashboardBottom({entries,rates}){
   );
 }
 
+// ── Dashboard Stat Cards (5 cols) ───────────────────────────────
+function DashStatCards({entries,allEntries,rates}){
+  const history=useMemo(()=>{
+    const by={};
+    (allEntries||entries).forEach(e=>{const k=mKey(e.date);if(!by[k])by[k]={kwh:0,cost:0,n:0};by[k].kwh+=+e.kwh||0;by[k].cost+=+e.final_price||0;by[k].n++;});
+    return Object.entries(by).sort(([a],[b])=>a<b?-1:1).slice(-6).map(([,v])=>v);
+  },[allEntries,entries]);
+  const s=useMemo(()=>{
+    const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
+    const totK=sum(entries,"kwh"),totC=sum(entries,"final_price");
+    const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
+    const now=sorted.length?sorted[0].date.slice(0,7):mKey(new Date().toISOString());
+    const prev=(()=>{const d=new Date(now+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
+    const pm=(allEntries||entries).filter(e=>e.date.startsWith(prev));
+    const pmK=sum(pm,"kwh"),pmC=sum(pm,"final_price");
+    const pct=(a,b)=>b?((a-b)/b)*100:null;
+    const savings=entries.reduce((a,e)=>a+(+e.discount||0),0);
+    return{totKwh:totK,totCost:totC,avgRate:totK?totC/totK:0,sessions:entries.length,kD:pct(totK,pmK),cD:pct(totC,pmC),savings};
+  },[entries,rates]);
+  const cards=[
+    {lbl:"พลังงานรวม",val:NUM(s.totKwh,1),suffix:"kWh",delta:s.kD,invert:true,spark:history.map(m=>m.kwh),color:"#6CAE76",
+     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>},
+    {lbl:"ค่าใช้จ่ายรวม",val:THB(s.totCost),delta:s.cD,invert:true,spark:history.map(m=>m.cost),color:"#E87B6A",
+     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>},
+    {lbl:"ราคาเฉลี่ย",val:NUM(s.avgRate,2),suffix:"฿/kWh",delta:s.cD,invert:true,spark:history.map(m=>m.kwh?m.cost/m.kwh:0),color:"#6AAAE8",
+     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>},
+    {lbl:"จำนวนครั้ง",val:s.sessions,suffix:"ครั้ง",delta:s.kD,invert:true,spark:history.map(m=>m.n),color:"#B98CE8",
+     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>},
+    {lbl:"ส่วนลดรวม",val:THB(s.savings),sub:"โปรโมชั่น / สมาชิก",color:"#4CAF6E",noSpark:true,
+     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>},
+  ];
+  return(
+    <div className="stats-5">
+      {cards.map((c,i)=>{
+        const up=c.invert?c.delta<0:c.delta>0;
+        return(
+          <div className="stat" key={i}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div className="lbl">{c.lbl}</div>
+              <div style={{width:34,height:34,borderRadius:9,background:c.color+"20",display:"grid",placeItems:"center",color:c.color,flexShrink:0}}>{c.icon}</div>
+            </div>
+            <div className="val" style={{marginTop:8,fontSize:c.suffix?20:22}}>{c.val}{c.suffix&&<small>{" "+c.suffix}</small>}</div>
+            {c.sub&&<div style={{fontSize:11,color:"var(--ink-3)",marginTop:3,lineHeight:1.4}}>{c.sub}</div>}
+            {c.delta!=null&&Math.abs(c.delta)>0.05&&(
+              <div className={"delta "+(up?"":"down")} style={{marginTop:6}}>
+                {up?I.trend:I.trendDn}{(c.delta>=0?"+":"")+c.delta.toFixed(1)}% จากเดือนก่อน
+              </div>
+            )}
+            {!c.noSpark&&<div style={{marginTop:"auto",paddingTop:10}}><Sparkline data={c.spark} color={c.color}/></div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Trend Chart (dual-axis bar+line) ─────────────────────────────
+function TrendChart({entries}){
+  const [metric,setMetric]=useState("cost");
+  const [hov,setHov]=useState(null);
+  const data=useMemo(()=>{
+    const by={};
+    entries.forEach(e=>{const k=mKey(e.date);if(!by[k])by[k]={kwh:0,cost:0,n:0};by[k].kwh+=+e.kwh||0;by[k].cost+=+e.final_price||0;by[k].n++;});
+    return Object.entries(by).sort(([a],[b])=>a<b?-1:1).slice(-6)
+      .map(([k,v])=>({key:k,label:mLbl(k),kwh:v.kwh,cost:v.cost,n:v.n,avg:v.kwh?v.cost/v.kwh:0}));
+  },[entries]);
+  const METRICS=[{v:"cost",l:"ค่าใช้จ่าย (฿)"},{v:"kwh",l:"พลังงาน (kWh)"},{v:"avg",l:"ราคาเฉลี่ย (฿/kWh)"}];
+  const getBar=d=>metric==="avg"?d.avg:d.kwh;
+  const showLine=metric==="cost";
+  const maxBar=Math.max(...data.map(getBar),1);
+  const maxLine=Math.max(...data.map(d=>d.cost),1);
+  const W=480,H=200,pL=46,pR=showLine?44:10,pT=22,pB=36;
+  const cw=W-pL-pR,ch=H-pT-pB;
+  const n=data.length||1;
+  const bw=Math.min((cw/n)*0.55,48);
+  const bx=i=>pL+(i+0.5)*(cw/n)-bw/2;
+  const bh=d=>Math.max(3,getBar(d)/maxBar*ch);
+  const by2=d=>pT+ch-bh(d);
+  const lx=i=>pL+(i+0.5)*(cw/n);
+  const ly=d=>pT+ch-(d.cost/maxLine)*ch;
+  const linePath=data.map((d,i)=>`${i===0?"M":"L"}${lx(i).toFixed(1)},${ly(d).toFixed(1)}`).join(" ");
+  const fmtY=v=>v>=1000?(v/1000).toFixed(1)+"k":v.toFixed(metric==="avg"?1:0);
+  return(
+    <div className="panel" style={{minHeight:300}}>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14}}>
+        <div><h3>แนวโน้มการชาร์จ 6 เดือนล่าสุด</h3><div className="panel-sub">แสดงข้อมูลย้อนหลัง</div></div>
+        <div className="chip-group small">
+          {METRICS.map(({v,l})=><button key={v} className={metric===v?"on":""} onClick={()=>setMetric(v)}>{l}</button>)}
+        </div>
+      </div>
+      {data.length===0?(
+        <div style={{height:160,display:"grid",placeItems:"center",color:"var(--ink-3)",fontSize:13}}>ยังไม่มีข้อมูล</div>
+      ):(
+        <>
+          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:"visible",display:"block"}}>
+            {[0.25,0.5,0.75,1].map(f=>(
+              <line key={f} x1={pL} x2={W-pR} y1={pT+ch*(1-f)} y2={pT+ch*(1-f)} stroke="var(--line)" strokeDasharray="4 3" strokeWidth="1"/>
+            ))}
+            {[0,0.5,1].map(f=>(
+              <text key={f} x={pL-6} y={pT+ch*(1-f)+4} textAnchor="end" fontSize="10" fill="var(--ink-3)" fontFamily="inherit">{fmtY(maxBar*f)}</text>
+            ))}
+            {showLine&&[0,0.5,1].map(f=>(
+              <text key={f} x={W-pR+6} y={pT+ch*(1-f)+4} textAnchor="start" fontSize="10" fill="#4F9F52" fontFamily="inherit">
+                {(()=>{const v=maxLine*f;return v>=1000?"฿"+(v/1000).toFixed(0)+"k":"฿"+v.toFixed(0);})()}
+              </text>
+            ))}
+            {data.map((d,i)=>(
+              <g key={d.key} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:"default"}}>
+                <rect x={pL+i*(cw/n)} y={pT} width={cw/n} height={ch} fill="transparent"/>
+                <rect x={bx(i)} y={by2(d)} width={bw} height={bh(d)} rx="5"
+                  fill={hov===i?"#6CAE76":"#A8D5A0"} style={{transition:"fill .1s"}}/>
+                <text x={lx(i)} y={H-6} textAnchor="middle" fontSize="10"
+                  fill={hov===i?"var(--ink)":"var(--ink-3)"} fontWeight={hov===i?"700":"400"} fontFamily="inherit">{d.label}</text>
+              </g>
+            ))}
+            {showLine&&(
+              <>
+                <path d={linePath} fill="none" stroke="#4F9F52" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                {data.map((d,i)=>(
+                  <circle key={i} cx={lx(i)} cy={ly(d)} r={hov===i?5:3.5} fill={hov===i?"#4F9F52":"#fff"} stroke="#4F9F52" strokeWidth="2"/>
+                ))}
+              </>
+            )}
+            {hov!=null&&(()=>{
+              const d=data[hov],i=hov;
+              const tipH=showLine?62:42,tipW=132;
+              const tx=Math.min(Math.max(lx(i)-tipW/2,pL),W-pR-tipW);
+              const ty=Math.max(pT-tipH-6,2);
+              return(
+                <g style={{pointerEvents:"none"}}>
+                  <rect x={tx} y={ty} width={tipW} height={tipH} rx="8" fill="#1B3A1F" opacity=".92"/>
+                  <text x={tx+10} y={ty+16} fontSize="11" fontWeight="700" fill="#fff" fontFamily="inherit">{d.label}</text>
+                  {showLine?(
+                    <>
+                      <text x={tx+10} y={ty+32} fontSize="10" fill="#A8D5A0" fontFamily="inherit">⚡ {NUM(d.kwh,1)} kWh</text>
+                      <text x={tx+10} y={ty+48} fontSize="10" fill="#A8D5A0" fontFamily="inherit">฿ {THB(d.cost)}</text>
+                    </>
+                  ):(
+                    <text x={tx+10} y={ty+30} fontSize="10" fill="#A8D5A0" fontFamily="inherit">
+                      {metric==="avg"?NUM(d.avg,2)+" ฿/kWh":NUM(d.kwh,1)+" kWh"}
+                    </text>
+                  )}
+                </g>
+              );
+            })()}
+          </svg>
+          {showLine&&(
+            <div style={{display:"flex",gap:16,marginTop:6,fontSize:12,color:"var(--ink-3)"}}>
+              <span style={{display:"flex",alignItems:"center",gap:5}}><span style={{width:12,height:10,borderRadius:2,background:"#A8D5A0",display:"inline-block"}}/> พลังงาน (kWh)</span>
+              <span style={{display:"flex",alignItems:"center",gap:5}}><span style={{width:20,height:2,background:"#4F9F52",display:"inline-block",borderRadius:1}}/> ค่าใช้จ่าย (฿)</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Insights Panel ───────────────────────────────────────────────
+function InsightsPanel({entries,allEntries,rates}){
+  const list=useMemo(()=>{
+    const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
+    const totK=sum(entries,"kwh"),totC=sum(entries,"final_price");
+    const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
+    const now=sorted.length?sorted[0].date.slice(0,7):mKey(new Date().toISOString());
+    const prev=(()=>{const d=new Date(now+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
+    const MSHORT=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+    const prevName=MSHORT[+prev.split("-")[1]-1];
+    const src=allEntries||entries;
+    const curE=src.filter(e=>e.date.startsWith(now)),prevE=src.filter(e=>e.date.startsWith(prev));
+    const curK=sum(curE,"kwh"),curC=sum(curE,"final_price"),prevK=sum(prevE,"kwh"),prevC=sum(prevE,"final_price");
+    const curAvg=curK?curC/curK:0,prevAvg=prevK?prevC/prevK:0;
+    const ins=[];
+    if(curAvg&&prevAvg){
+      const diff=((curAvg-prevAvg)/prevAvg)*100;
+      ins.push({icon:diff<0?"📉":"📈",color:diff<0?"#6CAE76":"#E87B6A",
+        text:`ค่าไฟเฉลี่ย${diff<0?"ลดลง":"เพิ่มขึ้น"} ${Math.abs(diff).toFixed(0)}%`,
+        sub:`เมื่อเทียบกับเดือน${prevName}`});
+    }
+    if(totK>0){
+      const offK=sum(entries.filter(e=>e.peak_type==="off_peak"),"kwh");
+      const pct=(offK/totK)*100;
+      ins.push({icon:"🌙",color:"#6AAAE8",text:`ชาร์จช่วง Off Peak ${pct.toFixed(0)}%`,
+        sub:pct>=50?"ช่วยประหยัดค่าใช้จ่ายได้มากขึ้น":"ลองชาร์จตอนกลางคืนเพื่อประหยัดกว่านี้"});
+    }
+    const byS={};
+    entries.forEach(e=>{if(!byS[e.station])byS[e.station]={kwh:0};byS[e.station].kwh+=+e.kwh||0;});
+    const top=Object.entries(byS).sort(([,a],[,b])=>b.kwh-a.kwh)[0];
+    if(top&&totK>0) ins.push({icon:"⚡",color:smeta(top[0],rates).color,
+      text:`ชาร์จที่ ${top[0]} มากที่สุด`,sub:`คิดเป็น ${(top[1].kwh/totK*100).toFixed(0)}% ของพลังงานทั้งหมด`});
+    const rVals=Object.values(rates);
+    if(rVals.length&&totK>0){
+      const maxRate=rVals.reduce((mx,r)=>Math.max(mx,r.type==="peak"?Math.max(r.on_peak||0,r.off_peak||0):(r.flat||0)),0);
+      if(maxRate>0){
+        const sav=Math.max(0,entries.reduce((a,e)=>a+maxRate*(+e.kwh||0),0)-totC);
+        if(sav>0) ins.push({icon:"💰",color:"#4CAF6E",text:`ประหยัดได้ ${THB(sav)}`,sub:"เมื่อเทียบกับสถานีที่แพงที่สุด"});
+      }
+    }
+    return ins;
+  },[entries,rates]);
+  return(
+    <div className="panel" style={{minHeight:300}}>
+      <h3>ภาพรวมเชิงลึก</h3>
+      <div className="panel-sub" style={{marginBottom:14}}>Insights</div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {list.length===0&&<div style={{color:"var(--ink-3)",fontSize:13,textAlign:"center",padding:"32px 0"}}>เพิ่มข้อมูลเพื่อดู insights</div>}
+        {list.map((ins,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",background:"var(--surface-soft)",borderRadius:10,border:"1px solid var(--line)"}}>
+            <div style={{width:34,height:34,borderRadius:9,background:ins.color+"20",display:"grid",placeItems:"center",fontSize:16,flexShrink:0}}>{ins.icon}</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--ink)"}}>{ins.text}</div>
+              <div style={{fontSize:12,color:"var(--ink-3)",marginTop:2}}>{ins.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Station Distribution Table ───────────────────────────────────
+function StationDistTable({entries,rates,onViewAll}){
+  const data=useMemo(()=>{
+    const by={};
+    entries.forEach(e=>{if(!by[e.station])by[e.station]={kwh:0,cost:0,n:0};by[e.station].kwh+=+e.kwh||0;by[e.station].cost+=+e.final_price||0;by[e.station].n++;});
+    const tot=Object.values(by).reduce((a,v)=>a+v.cost,0);
+    return Object.entries(by).map(([k,v])=>({name:k,...v,pct:tot?v.cost/tot*100:0,...smeta(k,rates)}))
+      .sort((a,b)=>b.cost-a.cost).slice(0,5);
+  },[entries,rates]);
+  return(
+    <div className="panel">
+      <h3>การกระจายตามสถานี</h3>
+      <div className="panel-sub" style={{marginBottom:12}}>ตามข้อมูลที่เลือก</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:"unset"}}>
+        <thead>
+          <tr style={{borderBottom:"2px solid var(--line)"}}>
+            {["สถานีชาร์จ","ครั้ง","kWh","ค่าใช้จ่าย","สัดส่วน"].map(h=>(
+              <th key={h} style={{textAlign:h==="สถานีชาร์จ"?"left":"right",padding:"6px 6px 10px",color:"var(--ink-3)",fontWeight:600,fontSize:12}}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.length===0&&<tr><td colSpan="5" style={{textAlign:"center",padding:"20px 0",color:"var(--ink-3)"}}>ยังไม่มีข้อมูล</td></tr>}
+          {data.map(d=>(
+            <tr key={d.name} style={{borderBottom:"1px solid var(--line)"}}>
+              <td style={{padding:"9px 6px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:7}}>
+                  <div style={{width:26,height:26,borderRadius:6,background:d.color,display:"grid",placeItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>{d.abbr}</div>
+                  <span style={{fontSize:12,fontWeight:600,color:"var(--ink)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:80}}>{d.name}</span>
+                </div>
+              </td>
+              <td style={{textAlign:"right",padding:"9px 6px",color:"var(--ink-3)",fontSize:12}}>{d.n}</td>
+              <td style={{textAlign:"right",padding:"9px 6px",color:"var(--ink-2)",fontWeight:500,fontSize:12}}>{NUM(d.kwh,1)}</td>
+              <td style={{textAlign:"right",padding:"9px 6px",fontWeight:700,color:"var(--ink)",fontSize:12}}>{THB(d.cost)}</td>
+              <td style={{padding:"9px 0 9px 6px"}}>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+                  <span style={{fontSize:11,fontWeight:700,color:d.color}}>{d.pct.toFixed(0)}%</span>
+                  <div style={{width:44,height:4,background:"var(--line)",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{width:d.pct+"%",height:"100%",background:d.color,borderRadius:2}}/>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {data.length>0&&<button className="link-btn" style={{marginTop:10,fontSize:12}} onClick={onViewAll}>ดูรายละเอียดทั้งหมด →</button>}
+    </div>
+  );
+}
+
+// ── Peak Time Panel ──────────────────────────────────────────────
+function PeakTimePanel({entries}){
+  const data=useMemo(()=>{
+    const MAP={on_peak:{lbl:"On Peak (09:00–22:00)",color:"#E87B6A"},off_peak:{lbl:"Off Peak (22:00–09:00)",color:"#6AAAE8"},null:{lbl:"Flat Rate",color:"#6CAE76"}};
+    const by={};
+    entries.forEach(e=>{const k=String(e.peak_type||"null");if(!by[k])by[k]={...(MAP[k]||{lbl:k,color:"#999"}),kwh:0,n:0};by[k].kwh+=+e.kwh||0;by[k].n++;});
+    const tot=Object.values(by).reduce((a,v)=>a+v.kwh,0);
+    return{items:Object.values(by).filter(v=>v.n>0).map(v=>({...v,pct:tot?v.kwh/tot*100:0})),tot};
+  },[entries]);
+  return(
+    <div className="panel">
+      <h3>ช่วงเวลาการชาร์จ</h3>
+      <div className="panel-sub" style={{marginBottom:12}}>แบ่งตาม Peak / Off Peak</div>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+        <DonutChart segments={data.items.map(d=>({value:d.kwh,color:d.color}))} total={data.tot} centerText={data.items.length?"100%":"-"} size={120}/>
+        <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8}}>
+          {data.items.length===0&&<div style={{color:"var(--ink-3)",fontSize:13,textAlign:"center"}}>ยังไม่มีข้อมูล</div>}
+          {data.items.map((d,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:7,fontSize:12}}>
+              <div style={{width:10,height:10,borderRadius:2,background:d.color,flexShrink:0}}/>
+              <div style={{flex:1,color:"var(--ink-2)",fontWeight:500}}>{d.lbl}</div>
+              <span style={{fontWeight:700,color:"var(--ink)"}}>{d.pct.toFixed(0)}%</span>
+              <span style={{color:"var(--ink-3)",minWidth:54,textAlign:"right"}}>{NUM(d.kwh,1)} kWh</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Cost Compare Panel ───────────────────────────────────────────
+function CostComparePanel({entries,rates}){
+  const totKwh=useMemo(()=>entries.reduce((a,e)=>a+(+e.kwh||0),0),[entries]);
+  const cmp=useMemo(()=>{
+    const rows=[];
+    Object.entries(rates).forEach(([name,r])=>{
+      const color=r.color||"#8AA08C",abbr=r.abbr||makeAbbr(name);
+      if(r.type==="peak"){
+        if(r.on_peak) rows.push({name,label:"On Peak",cost:(r.on_peak||0)*totKwh,color,abbr,peakTag:"on"});
+        if(r.off_peak) rows.push({name,label:"Off Peak",cost:(r.off_peak||0)*totKwh,color,abbr,peakTag:"off"});
+      } else {
+        rows.push({name,label:null,cost:(r.flat||0)*totKwh,color,abbr});
+      }
+    });
+    return rows.filter(d=>d.cost>0).sort((a,b)=>a.cost-b.cost);
+  },[rates,totKwh]);
+  const maxCost=cmp.length?cmp[cmp.length-1].cost:1;
+  const cheap=cmp[0],exp=cmp[cmp.length-1];
+  const savings=cheap&&exp&&cheap!==exp?exp.cost-cheap.cost:0;
+  return(
+    <div className="panel">
+      <h3>เปรียบเทียบค่าใช้จ่าย</h3>
+      <div className="panel-sub" style={{marginBottom:12}}>คำนวณจากพลังงาน {NUM(totKwh,1)} kWh ที่แต่ละสถานี</div>
+      {cmp.length===0?(
+        <div style={{color:"var(--ink-3)",fontSize:13,textAlign:"center",padding:"20px 0"}}>ต้องการข้อมูลราคาสถานี</div>
+      ):(
+        <>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {cmp.map((d,i)=>(
+              <div key={i}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <div style={{width:24,height:24,borderRadius:6,background:d.color,display:"grid",placeItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>{d.abbr}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--ink)"}}>{d.name}</span>
+                    {d.label&&<span style={{marginLeft:6,fontSize:11,padding:"1px 6px",borderRadius:999,fontWeight:600,
+                      background:d.peakTag==="on"?"#FFF3CD":d.peakTag==="off"?"#E8F5E9":"var(--mint)",
+                      color:d.peakTag==="on"?"#9A6400":d.peakTag==="off"?"#2E7D32":"var(--ink-2)"}}>{d.label}</span>}
+                  </div>
+                  <div style={{fontSize:13,fontWeight:700,color:"var(--ink)",flexShrink:0}}>{THB(d.cost)}</div>
+                </div>
+                <div style={{width:"100%",height:5,background:"var(--line)",borderRadius:3,overflow:"hidden"}}>
+                  <div style={{width:(d.cost/maxCost*100)+"%",height:"100%",background:d.peakTag==="off"?d.color+"99":d.color,borderRadius:3,transition:"width .3s"}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+          {savings>0&&cheap&&(
+            <div style={{marginTop:14,padding:"12px 14px",background:"var(--mint)",borderRadius:10,border:"1px solid var(--mint-2)"}}>
+              <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:1}}>คุณประหยัดได้</div>
+              <div style={{fontSize:22,fontWeight:700,color:"var(--leaf-deep)"}}>{THB(savings)}</div>
+              <div style={{fontSize:12,color:"var(--ink-3)",marginTop:1}}>จากการเลือกสถานี {cheap.name}</div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Recent Charges Panel ─────────────────────────────────────────
+function RecentChargesPanel({entries,rates,onViewAll}){
+  const recent=useMemo(()=>[...entries].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5),[entries]);
+  return(
+    <div className="panel">
+      <h3>ประวัติการชาร์จล่าสุด</h3>
+      <div className="panel-sub" style={{marginBottom:12}}>5 รายการล่าสุด</div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:"unset"}}>
+          <thead>
+            <tr style={{borderBottom:"2px solid var(--line)"}}>
+              {["วันที่","สถานี","เวลา","พลังงาน","ค่าใช้จ่าย","ประเภท"].map(h=>(
+                <th key={h} style={{textAlign:"left",padding:"6px 8px 10px",color:"var(--ink-3)",fontWeight:600,fontSize:12,whiteSpace:"nowrap"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {recent.length===0&&<tr><td colSpan="6" style={{textAlign:"center",padding:"24px 0",color:"var(--ink-3)"}}>ยังไม่มีรายการ</td></tr>}
+            {recent.map(e=>{
+              const s=smeta(e.station,rates);
+              const snap=e.rate_snapshot||{};
+              const isPeak=e.peak_type==="on_peak",isOff=e.peak_type==="off_peak";
+              const timeStr=isPeak?(snap.on_time||"--"):(isOff?(snap.off_time||"--"):"--");
+              return(
+                <tr key={e.id} style={{borderBottom:"1px solid var(--line)"}}>
+                  <td style={{padding:"9px 8px",color:"var(--ink)",fontWeight:500,whiteSpace:"nowrap"}}>{dLbl(e.date)}</td>
+                  <td style={{padding:"9px 8px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:7}}>
+                      <div style={{width:26,height:26,borderRadius:6,background:s.color,display:"grid",placeItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>{s.abbr}</div>
+                      <span style={{fontWeight:600,color:"var(--ink)",whiteSpace:"nowrap"}}>{e.station}</span>
+                    </div>
+                  </td>
+                  <td style={{padding:"9px 8px",color:"var(--ink-3)",whiteSpace:"nowrap",fontSize:12}}>{timeStr}</td>
+                  <td style={{padding:"9px 8px",color:"var(--ink-2)",fontWeight:500}}>{NUM(e.kwh,1)} kWh</td>
+                  <td style={{padding:"9px 8px",fontWeight:700,color:"var(--ink)"}}>{THB(e.final_price)}</td>
+                  <td style={{padding:"9px 8px"}}>
+                    {isPeak&&<span className="peak-pill peak-on">On Peak</span>}
+                    {isOff&&<span className="peak-pill peak-off">Off Peak</span>}
+                    {!isPeak&&!isOff&&<span style={{fontSize:12,color:"var(--ink-3)"}}>Flat</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {recent.length>0&&<button className="link-btn" style={{marginTop:10,fontSize:12}} onClick={onViewAll}>ดูประวัติทั้งหมด →</button>}
+    </div>
+  );
+}
+
+// ── Vehicle Efficiency Panel ─────────────────────────────────────
+const EV_EFF_DEFAULT=5.2;
+function VehicleEffPanel({entries,allEntries}){
+  const data=useMemo(()=>{
+    // คำนวณประสิทธิภาพจาก odometer จริง
+    const src=[...(allEntries||entries)].filter(e=>e.odometer!=null).sort((a,b)=>a.date.localeCompare(b.date)||(a.id-b.id));
+    let totalKm=0,totalKwhOdo=0;
+    for(let i=1;i<src.length;i++){
+      const km=+src[i].odometer-(+src[i-1].odometer);
+      const kwh=+src[i].kwh||0;
+      if(km>0&&km<3000&&kwh>0){totalKm+=km;totalKwhOdo+=kwh;}
+    }
+    const hasReal=totalKm>0&&totalKwhOdo>0;
+    const eff=hasReal?totalKm/totalKwhOdo:EV_EFF_DEFAULT;
+    const totK=entries.reduce((a,e)=>a+(+e.kwh||0),0);
+    const totC=entries.reduce((a,e)=>a+(+e.final_price||0),0);
+    const avgRate=totK?totC/totK:0;
+    return{eff,hasReal,totalKm,perKm:avgRate?avgRate/eff:0,per100km:avgRate?avgRate/eff*100:0,avgRate};
+  },[entries,allEntries]);
+  const stats=[
+    {lbl:"ประสิทธิภาพเฉลี่ย",val:NUM(data.eff,1),suf:"km/kWh",icon:"🏎️"},
+    {lbl:"ต่อกิโลเมตร",val:data.avgRate?THB(data.perKm):"--",icon:"📍"},
+    {lbl:"ต่อ 100 กิโลเมตร",val:data.avgRate?THB(data.per100km):"--",icon:"🛣️"},
+  ];
+  return(
+    <div className="panel">
+      <h3>ประสิทธิภาพการใช้รถ</h3>
+      <div className="panel-sub" style={{marginBottom:14}}>
+        {data.hasReal?`จากเลขไมล์จริง · ขับแล้ว ${NUM(data.totalKm,0)} km`:`โดยประมาณ (Deepal S07 ${EV_EFF_DEFAULT} km/kWh)`}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        {stats.map((s,i)=>(
+          <div key={i} style={{background:"var(--surface-soft)",borderRadius:10,padding:"13px 10px",textAlign:"center",border:"1px solid var(--line)"}}>
+            <div style={{fontSize:20,marginBottom:5}}>{s.icon}</div>
+            <div style={{fontSize:17,fontWeight:700,color:"var(--ink)",lineHeight:1.2}}>{s.val}</div>
+            {s.suf&&<div style={{fontSize:11,color:"var(--ink-3)",marginTop:2}}>{s.suf}</div>}
+            <div style={{fontSize:11,color:"var(--ink-3)",marginTop:4}}>{s.lbl}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{marginTop:10,fontSize:11,color:"var(--muted)",textAlign:"center"}}>
+        {data.hasReal
+          ?`ประสิทธิภาพ ${NUM(data.eff,2)} km/kWh · ราคาเฉลี่ย ${NUM(data.avgRate,2)} ฿/kWh`
+          :`ยังไม่มีข้อมูลเลขไมล์ — บันทึก odometer เพื่อดูค่าจริง`}
+      </div>
+    </div>
+  );
+}
+
 // ── Line Chart ──────────────────────────────────────────────────
 function LineChart({data,color="#6CAE76",h=200}){
   if(!data||data.length<2) return <div style={{height:h,display:"grid",placeItems:"center",color:"var(--ink-3)",fontSize:13}}>ยังไม่มีข้อมูล</div>;
@@ -590,44 +1051,119 @@ function LineChart({data,color="#6CAE76",h=200}){
   );
 }
 
+// ── Expense Trend Bar Chart ──────────────────────────────────────
+function ExpBarChart({data,selectedKey}){
+  const [hov,setHov]=useState(null);
+  const W=460,H=200,pL=46,pR=10,pT=20,pB=30;
+  const ch=H-pT-pB,cw=W-pL-pR;
+  const maxC=Math.max(...data.map(d=>d.cost),1);
+  const n=data.length;
+  const bw=Math.min(30,(cw/n)*0.6);
+  const bx=i=>pL+i*(cw/n)+(cw/n-bw)/2;
+  const bh=d=>Math.max(3,d.cost/maxC*ch);
+  const by2=d=>pT+ch-bh(d);
+  const cx=i=>bx(i)+bw/2;
+  const fmtC=v=>v>=1000?"฿"+(v/1000).toFixed(1)+"k":"฿"+v.toFixed(0);
+  return(
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:"visible",display:"block"}}>
+      {[0.5,1].map(f=>(
+        <line key={f} x1={pL} x2={W-pR} y1={pT+ch*(1-f)} y2={pT+ch*(1-f)} stroke="var(--line)" strokeDasharray="4 3" strokeWidth="1"/>
+      ))}
+      {[0,0.5,1].map(f=>(
+        <text key={f} x={pL-4} y={pT+ch*(1-f)+4} textAnchor="end" fontSize="10" fill="var(--ink-3)" fontFamily="inherit">{fmtC(maxC*f)}</text>
+      ))}
+      {data.map((d,i)=>{
+        const isSel=d.key===selectedKey;
+        const isHov=hov===i;
+        const fill=isSel?"#1B6B3A":(isHov?"#6CAE76":"#A8D5A0");
+        return(
+          <g key={d.key} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:"default"}}>
+            <rect x={bx(i)} y={pT} width={cw/n} height={ch} fill="transparent"/>
+            <rect x={bx(i)} y={by2(d)} width={bw} height={bh(d)} rx="4" fill={fill} style={{transition:"fill .1s"}}/>
+            <text x={cx(i)} y={H-6} textAnchor="middle" fontSize="10"
+              fill={isSel?"var(--ink)":(isHov?"var(--ink)":"var(--ink-3)")} fontWeight={isSel?"700":"400"} fontFamily="inherit">{d.label}</text>
+            {(isHov||isSel)&&(
+              <text x={cx(i)} y={by2(d)-5} textAnchor="middle" fontSize="10" fill="var(--ink)" fontWeight="600" fontFamily="inherit">{fmtC(d.cost)}</text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ── Expense Page ─────────────────────────────────────────────────
-const BUDGET_KEY="ev_budget";
 function ExpensePage({entries,rates}){
   const now=new Date();
   const [subTab,setSubTab]=useState("ภาพรวม");
-  const years=useMemo(()=>[...new Set(entries.map(e=>+e.date.slice(0,4)))].sort((a,b)=>b-a),[entries]);
-  const [yr,setYr]=useState(()=>now.getFullYear());
-  const [mo,setMo]=useState(()=>now.getMonth()+1);
-  const [budget,setBudget]=useState(()=>+localStorage.getItem(BUDGET_KEY)||0);
-  const [editBudget,setEditBudget]=useState(false);
-  const [budgetInput,setBudgetInput]=useState("");
+  const [expYear,setExpYear]=useState(()=>now.getFullYear());
+  const [expMonth,setExpMonth]=useState(()=>now.getMonth()+1);
 
-  const monthKey=`${yr}-${String(mo).padStart(2,"0")}`;
-  const prevKey=(()=>{const d=new Date(monthKey+"-01");d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)})();
-  const mE=useMemo(()=>entries.filter(e=>e.date.startsWith(monthKey)),[entries,monthKey]);
-  const pE=useMemo(()=>entries.filter(e=>e.date.startsWith(prevKey)),[entries,prevKey]);
-  const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
-
-  const totC=sum(mE,"final_price"),totK=sum(mE,"kwh"),totD=sum(mE,"discount");
-  const avgSess=mE.length?totC/mE.length:0,avgRate=totK?totC/totK:0;
-  const pC=sum(pE,"final_price"),pK=sum(pE,"kwh");
-  const pAvg=pK?pC/pK:0;
-  const pct=(a,b)=>b?((a-b)/b)*100:null;
-  const discSessions=mE.filter(e=>+e.discount>0).length;
-
-  const trendData=useMemo(()=>{
+  const MONTHS_TH=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const expYearOpts=useMemo(()=>{
     const by={};
-    entries.forEach(e=>{const k=mKey(e.date);if(!by[k])by[k]={cost:0,kwh:0};by[k].cost+=+e.final_price||0;by[k].kwh+=+e.kwh||0;});
-    return Object.entries(by).sort(([a],[b])=>a<b?-1:1).slice(-8).map(([k,v])=>({label:mLbl(k),value:v.cost,label2:THB(v.cost)}));
+    entries.forEach(e=>{const y=+e.date.slice(0,4),m=+e.date.slice(5,7);if(!by[y])by[y]=new Set();by[y].add(m);});
+    return Object.entries(by).sort(([a],[b])=>+a-+b).map(([y,ms])=>({year:+y,months:[...ms].sort((a,b)=>a-b)}));
   },[entries]);
 
+  const mE=useMemo(()=>{
+    let r=entries;
+    if(expYear!==0) r=r.filter(e=>+e.date.slice(0,4)===expYear);
+    if(expYear!==0&&expMonth!==0) r=r.filter(e=>+e.date.slice(5,7)===expMonth);
+    return r;
+  },[entries,expYear,expMonth]);
+
+  const pE=useMemo(()=>{
+    if(expYear===0) return [];
+    if(expMonth===0) return entries.filter(e=>+e.date.slice(0,4)===expYear-1);
+    const d=new Date(`${expYear}-${String(expMonth).padStart(2,"0")}-01`);
+    d.setMonth(d.getMonth()-1);
+    return entries.filter(e=>+e.date.slice(0,4)===d.getFullYear()&&+e.date.slice(5,7)===d.getMonth()+1);
+  },[entries,expYear,expMonth]);
+
+  const sum=(arr,f)=>arr.reduce((a,e)=>a+(+e[f]||0),0);
+
+  const totC=sum(mE,"final_price");
+  const avgSess=mE.length?totC/mE.length:0;
+  const pC=sum(pE,"final_price");
+  const pct=(a,b)=>b?((a-b)/b)*100:null;
+
+  const prevPeriodName=useMemo(()=>{
+    if(expYear===0||pE.length===0) return "";
+    if(expMonth===0) return `ปี ${(expYear-1)+543}`;
+    const d=new Date(`${expYear}-${String(expMonth).padStart(2,"0")}-01`);
+    d.setMonth(d.getMonth()-1);
+    return `${MONTHS_TH[d.getMonth()]} ${d.getFullYear()+543}`;
+  },[expYear,expMonth,pE]);
+
+  const monthKey=expYear===0?null:expMonth===0?null:`${expYear}-${String(expMonth).padStart(2,"0")}`;
+  const mo=expMonth; // alias for tab labels
+
+  // On/Off Peak costs
+  const pkCosts=useMemo(()=>{
+    const on=sum(mE.filter(e=>e.peak_type==="on_peak"),"final_price");
+    const off=sum(mE.filter(e=>e.peak_type!=="on_peak"),"final_price");
+    return{on,off};
+  },[mE]);
+  const onPct=totC?pkCosts.on/totC*100:0;
+  const offPct=totC?pkCosts.off/totC*100:0;
+
+  // Trend data (last 8 months)
+  const trendData=useMemo(()=>{
+    const by={};
+    entries.forEach(e=>{const k=mKey(e.date);if(!by[k])by[k]={cost:0,kwh:0,n:0};by[k].cost+=+e.final_price||0;by[k].kwh+=+e.kwh||0;by[k].n++;});
+    return Object.entries(by).sort(([a],[b])=>a<b?-1:1).slice(-8).map(([k,v])=>({key:k,label:mLbl(k),...v}));
+  },[entries]);
+
+  // Station breakdown
   const stBd=useMemo(()=>{
     const by={};
     mE.forEach(e=>{if(!by[e.station])by[e.station]={kwh:0,cost:0,n:0};by[e.station].kwh+=+e.kwh||0;by[e.station].cost+=+e.final_price||0;by[e.station].n++;});
     const tot=Object.values(by).reduce((a,v)=>a+v.cost,0);
-    return{items:Object.entries(by).map(([k,v])=>({key:k,...v,pct:tot?v.cost/tot*100:0,color:smeta(k,rates).color,abbr:smeta(k,rates).abbr})).sort((a,b)=>b.cost-a.cost),tot};
+    return Object.entries(by).map(([k,v])=>({name:k,...v,pct:tot?v.cost/tot*100:0,...smeta(k,rates)})).sort((a,b)=>b.cost-a.cost);
   },[mE,rates]);
 
+  // Peak breakdown for ช่วงเวลา tab
   const pkBd=useMemo(()=>{
     const MAP={on_peak:{lbl:"On Peak",color:"#E87B6A"},off_peak:{lbl:"Off Peak",color:"#6AAAE8"},null:{lbl:"Flat Rate",color:"#6CAE76"}};
     const by={};
@@ -636,203 +1172,307 @@ function ExpensePage({entries,rates}){
     return{items:Object.values(by).filter(v=>v.n>0).map(v=>({...v,pct:tot?v.cost/tot*100:0,value:v.cost})),tot};
   },[mE]);
 
-  const budgetPct=budget>0?Math.min(totC/budget*100,100):0;
-  const MONTHS_TH=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-  const monthOpts=useMemo(()=>{
-    const opts=[];
-    years.forEach(y=>MONTHS_TH.forEach((_,i)=>{const k=`${y}-${String(i+1).padStart(2,"0")}`;if(entries.some(e=>e.date.startsWith(k)))opts.push({y,m:i+1,k,lbl:`${MONTHS_TH[i]} ${y+543}`});}));
-    return opts.reverse();
-  },[entries,years]);
+  // Insight cards data
+  const insightData=useMemo(()=>{
+    const onC=pkCosts.on,offC=pkCosts.off;
+    const peakTimeLbl=onC>=offC?"09:00 – 22:00":"22:00 – 09:00";
+    const peakTimeAmt=Math.max(onC,offC);
+    const peakTimePct=totC?peakTimeAmt/totC*100:0;
+    const byDay={};
+    mE.forEach(e=>{if(!byDay[e.date])byDay[e.date]=0;byDay[e.date]+=+e.final_price||0;});
+    const expDay=Object.entries(byDay).sort(([,a],[,b])=>b-a)[0]||null;
+    const expSess=mE.length?[...mE].sort((a,b)=>(+b.final_price||0)-(+a.final_price||0))[0]:null;
+    const byS={};
+    mE.forEach(e=>{if(!byS[e.station])byS[e.station]={kwh:0,cost:0};byS[e.station].kwh+=+e.kwh||0;byS[e.station].cost+=+e.final_price||0;});
+    const bestSt=Object.entries(byS).filter(([,v])=>v.kwh>=1).map(([k,v])=>({name:k,avg:v.kwh?v.cost/v.kwh:0,...smeta(k,rates)})).sort((a,b)=>a.avg-b.avg)[0]||null;
+    return{peakTimeLbl,peakTimeAmt,peakTimePct,expDay,expSess,bestSt};
+  },[mE,pkCosts,totC,rates]);
 
   const DeltaBadge=({d,invert=false})=>{
     if(d==null||Math.abs(d)<0.05) return null;
     const up=invert?d<0:d>0;
-    return <span className={"delta "+(up?"":"down")} style={{fontSize:11,marginLeft:6}}>{d>=0?"+":""}{d.toFixed(1)}%</span>;
+    return <span className={"delta "+(up?"":"down")} style={{fontSize:11}}>{d>=0?"+":""}{d.toFixed(1)}%</span>;
   };
 
-  // ─── Stat cards ───
-  const statCards=[
-    {lbl:"ค่าใช้จ่ายรวม",val:THB(totC),d:pct(totC,pC),inv:true,icon:"💳",bg:"#E87B6A20"},
-    {lbl:"เฉลี่ยต่อครั้ง",val:THB(avgSess),d:pct(avgSess,pC&&pE.length?pC/pE.length:0),inv:true,icon:"⚡",bg:"#6AAAE820"},
-    {lbl:"ราคาเฉลี่ย kWh",val:NUM(avgRate,2)+" ฿/kWh",d:pct(avgRate,pAvg),inv:true,icon:"📊",bg:"#6CAE7620"},
-    {lbl:"ส่วนลดรวม",val:THB(totD),sub:discSessions+" รายการ",icon:"🏷️",bg:"#F5A62320"},
-  ];
+  const handleDownload=()=>{
+    const dlKey=expYear===0?"all":expMonth===0?String(expYear):monthKey;
+    const rows=[["วันที่","สถานี","kWh","฿/kWh","ส่วนลด","ยอดรวม","ประเภท"],...[...mE].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>[e.date,e.station,e.kwh,e.baht_per_kwh,e.discount,e.final_price,e.peak_type||"flat"])];
+    const csv=rows.map(r=>r.join(",")).join("\n");
+    const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download=`charges_${dlKey}.csv`;a.click();
+  };
 
-  // ─── Station breakdown for sub-tab ───
-  const StationBreakdown=()=>(
-    <div>
-      <div style={{display:"flex",gap:20,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-        <DonutChart segments={stBd.items.map(b=>({value:b.cost,color:b.color}))} total={stBd.tot} centerText={THB(stBd.tot)} size={150}/>
-        <div style={{flex:1,display:"flex",flexDirection:"column",gap:10}}>
-          {stBd.items.map(b=>(
-            <div key={b.key} style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:10,height:10,borderRadius:3,background:b.color,flexShrink:0}}/>
-              <div style={{flex:1,fontSize:13,fontWeight:600,color:"var(--ink-2)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.key}</div>
-              <span style={{fontSize:12,color:"var(--ink-3)",minWidth:36,textAlign:"right"}}>{b.pct.toFixed(0)}%</span>
-              <span style={{fontSize:13,fontWeight:700,color:"var(--ink)",minWidth:70,textAlign:"right"}}>{THB(b.cost)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  const EntryRow=({e})=>{
+    const s=smeta(e.station,rates);
+    const snap=e.rate_snapshot||{};
+    const isPeak=e.peak_type==="on_peak",isOff=e.peak_type==="off_peak";
+    const timeStr=isPeak?(snap.on_time||"--"):(isOff?(snap.off_time||"--"):"--");
+    return(
+      <tr style={{borderBottom:"1px solid var(--line)"}}>
+        <td style={{padding:"9px 8px",color:"var(--ink)",fontWeight:500,whiteSpace:"nowrap"}}>{dLbl(e.date)}</td>
+        <td style={{padding:"9px 8px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <div style={{width:24,height:24,borderRadius:6,background:s.color,display:"grid",placeItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>{s.abbr}</div>
+            <span style={{fontWeight:600,color:"var(--ink)",whiteSpace:"nowrap"}}>{e.station}</span>
+          </div>
+        </td>
+        <td style={{padding:"9px 8px",color:"var(--ink-3)",whiteSpace:"nowrap",fontSize:12}}>{timeStr}</td>
+        <td style={{padding:"9px 8px",color:"var(--ink-2)",fontWeight:500,whiteSpace:"nowrap"}}>{NUM(e.kwh,1)} kWh</td>
+        <td style={{padding:"9px 8px",fontWeight:700,color:"var(--ink)",whiteSpace:"nowrap"}}>{THB(e.final_price)}</td>
+        <td style={{padding:"9px 8px",color:"var(--ink-2)",whiteSpace:"nowrap"}}>{NUM((+e.final_price)/(+e.kwh||1),2)} ฿/kWh</td>
+        <td style={{padding:"9px 8px"}}>
+          {isPeak&&<span className="peak-pill peak-on">On Peak</span>}
+          {isOff&&<span className="peak-pill peak-off">Off Peak</span>}
+          {!isPeak&&!isOff&&<span style={{fontSize:12,color:"var(--ink-3)"}}>Flat</span>}
+        </td>
+      </tr>
+    );
+  };
 
   return(
     <div>
-      {/* Month selector + sub-nav */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
-        <p style={{margin:0,fontSize:13,color:"var(--ink-3)"}}>วิเคราะห์และจัดการค่าใช้จ่ายในการชาร์จ</p>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <select className="field input" style={{fontSize:13,padding:"6px 10px",borderRadius:8,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer"}}
-            value={monthKey} onChange={e=>{const[y,m]=e.target.value.split("-");setYr(+y);setMo(+m);}}>
-            {monthOpts.map(o=><option key={o.k} value={o.k}>{o.lbl}</option>)}
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontSize:13,color:"var(--ink-3)"}}>วิเคราะห์ค่าใช้จ่ายค่าชาร์จทั้งหมดของคุณ</div>
+          {prevPeriodName&&<div style={{fontSize:12,color:"var(--ink-3)",marginTop:3}}>เทียบกับ {prevPeriodName} ⓘ</div>}
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <select value={expYear===0?"all":expYear}
+            onChange={e=>{const v=e.target.value;setExpYear(v==="all"?0:+v);setExpMonth(0);}}
+            style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}>
+            <option value="all">ทุกปี</option>
+            {expYearOpts.map(o=><option key={o.year} value={o.year}>{o.year}</option>)}
           </select>
+          <select value={expMonth===0?"all":expMonth}
+            onChange={e=>{const v=e.target.value;setExpMonth(v==="all"?0:+v);}}
+            style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}>
+            <option value="all">ทุกเดือน</option>
+            {(expYear===0
+              ?expYearOpts.flatMap(o=>o.months.map(m=>({year:o.year,m})))
+              :(expYearOpts.find(o=>o.year===expYear)?.months||[]).map(m=>({year:expYear,m}))
+            ).map(({year,m})=><option key={`${year}-${m}`} value={m}>{MONTHS_FULL[m-1]}</option>)}
+          </select>
+          <button className="btn btn-ghost" style={{fontSize:12,padding:"6px 12px",display:"flex",alignItems:"center",gap:5}} onClick={handleDownload}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            ดาวน์โหลด
+          </button>
         </div>
       </div>
 
+      {/* Sub-tabs */}
       <div className="chip-group" style={{marginBottom:20,width:"fit-content"}}>
-        {["ภาพรวม","แนวโน้ม","แยกตามสถานี","แยกตามหมวด"].map(t=>(
+        {["ภาพรวม","แนวโน้ม","แยกตามสถานี","ช่วงเวลา","รายการชาร์จ"].map(t=>(
           <button key={t} className={subTab===t?"on":""} onClick={()=>setSubTab(t)}>{t}</button>
         ))}
       </div>
 
       {/* ── ภาพรวม ── */}
       {subTab==="ภาพรวม"&&(<>
-        {/* Stat cards */}
-        <div className="stats" style={{marginBottom:16}}>
-          {statCards.map((c,i)=>(
-            <div className="stat" key={i} style={{minHeight:"unset"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div className="lbl">{c.lbl}</div>
-                <div style={{fontSize:20}}>{c.icon}</div>
-              </div>
-              <div className="val" style={{marginTop:8,fontSize:22}}>{c.val}</div>
-              {c.d!=null?<DeltaBadge d={c.d} invert={c.inv}/>:c.sub&&<span style={{fontSize:12,color:"var(--ink-3)"}}>{c.sub}</span>}
+
+        {/* 4 Stat cards */}
+        <div className="exp-4cards" style={{marginBottom:14}}>
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:6}}>ค่าใช้จ่ายรวม</div>
+            <div style={{fontSize:26,fontWeight:700,color:"var(--ink)",lineHeight:1.2}}>{THB(totC)}</div>
+            <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6}}>
+              <DeltaBadge d={pct(totC,pC)} invert={true}/>
+              {pC>0&&prevPeriodName&&<span style={{fontSize:11,color:"var(--ink-3)"}}>จาก{prevPeriodName}</span>}
             </div>
-          ))}
+          </div>
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:6}}>เฉลี่ยต่อครั้ง</div>
+            <div style={{fontSize:26,fontWeight:700,color:"var(--ink)",lineHeight:1.2}}>{THB(avgSess)}</div>
+            <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6}}>
+              <DeltaBadge d={pct(avgSess,pE.length?sum(pE,"final_price")/pE.length:0)} invert={true}/>
+              {pE.length>0&&prevPeriodName&&<span style={{fontSize:11,color:"var(--ink-3)"}}>จาก{prevPeriodName}</span>}
+            </div>
+          </div>
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:6}}>ค่าใช้จ่าย On Peak</div>
+            <div style={{fontSize:26,fontWeight:700,color:"var(--ink)",lineHeight:1.2}}>{THB(pkCosts.on)}</div>
+            <div style={{marginTop:8}}>
+              <div style={{fontSize:11,color:"#E87B6A",fontWeight:600,marginBottom:4}}>{onPct.toFixed(0)}% ของค่าใช้จ่ายทั้งหมด</div>
+              <div style={{height:4,background:"var(--line)",borderRadius:2}}>
+                <div style={{width:onPct+"%",height:"100%",background:"#E87B6A",borderRadius:2,transition:"width .3s"}}/>
+              </div>
+            </div>
+          </div>
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:6}}>ค่าใช้จ่าย Off Peak</div>
+            <div style={{fontSize:26,fontWeight:700,color:"var(--ink)",lineHeight:1.2}}>{THB(pkCosts.off)}</div>
+            <div style={{marginTop:8}}>
+              <div style={{fontSize:11,color:"#6AAAE8",fontWeight:600,marginBottom:4}}>{offPct.toFixed(0)}% ของค่าใช้จ่ายทั้งหมด</div>
+              <div style={{height:4,background:"var(--line)",borderRadius:2}}>
+                <div style={{width:offPct+"%",height:"100%",background:"#6AAAE8",borderRadius:2,transition:"width .3s"}}/>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Chart + Breakdown */}
-        <div className="panels" style={{marginBottom:16}}>
+        {/* Trend chart + Station ranking */}
+        <div className="dash-2col" style={{marginBottom:14}}>
           <div className="panel" style={{minHeight:"unset"}}>
-            <div className="panel-hd"><h3>แนวโน้มค่าใช้จ่าย</h3></div>
-            <LineChart data={trendData} color="var(--leaf-2)" h={200}/>
-          </div>
-          <div className="panel" style={{minHeight:"unset"}}>
-            <h3>แยกตามสถานี</h3>
-            <div className="panel-sub" style={{marginBottom:14}}>{MONTHS_TH[mo-1]} {yr+543}</div>
-            <StationBreakdown/>
-          </div>
-        </div>
-
-        {/* Comparison + Budget + Savings */}
-        <div className="expense-3col">
-          {/* เปรียบเทียบกับเดือนก่อน */}
-          <div className="panel" style={{minHeight:"unset",padding:18}}>
-            <h3 style={{marginBottom:14}}>เปรียบเทียบกับเดือนก่อน</h3>
-            {[
-              {lbl:"ค่าใช้จ่ายรวม",cur:totC,prv:pC,fmt:THB,inv:true},
-              {lbl:"พลังงาน",cur:totK,prv:pK,fmt:v=>NUM(v,1)+" kWh"},
-              {lbl:"ราคาเฉลี่ย",cur:avgRate,prv:pAvg,fmt:v=>NUM(v,2)+" ฿/kWh",inv:true},
-            ].map((r,i)=>{
-              const d=pct(r.cur,r.prv);
-              const up=r.inv?d<0:d>0;
+            <h3 style={{marginBottom:14}}>แนวโน้มค่าใช้จ่ายรายเดือน</h3>
+            {trendData.length===0
+              ?<div style={{height:160,display:"grid",placeItems:"center",color:"var(--ink-3)",fontSize:13}}>ยังไม่มีข้อมูล</div>
+              :<ExpBarChart data={trendData} selectedKey={monthKey}/>
+            }
+            {pC>0&&totC>0&&(()=>{
+              const diff=totC-pC;
+              const pctD=Math.abs((diff/pC)*100);
+              const lower=diff<0;
               return(
-                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingBottom:10,marginBottom:10,borderBottom:i<2?"1px solid var(--line)":"none"}}>
-                  <div>
-                    <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:2}}>{r.lbl}</div>
-                    <div style={{fontSize:14,fontWeight:700}}>{r.fmt(r.cur)}</div>
-                    <div style={{fontSize:11,color:"var(--ink-3)"}}>จาก {r.fmt(r.prv)}</div>
+                <div style={{marginTop:12,padding:"10px 12px",background:lower?"var(--surface-soft)":"#FEF3F2",borderRadius:8,borderLeft:`3px solid ${lower?"var(--leaf-2)":"#E87B6A"}`}}>
+                  <div style={{fontSize:12,color:lower?"var(--leaf-2)":"#E87B6A",fontWeight:600}}>
+                    ค่าใช้จ่ายรวมเดือนนี้{lower?"ต่ำกว่า":"สูงกว่า"}เดือนก่อน {THB(Math.abs(diff))} {lower?"ลดลง":"เพิ่มขึ้น"} {pctD.toFixed(1)}%
                   </div>
-                  {d!=null&&<span className={"delta "+(up?"":"down")} style={{fontSize:12}}>{d>=0?"+":""}{d.toFixed(1)}%</span>}
                 </div>
               );
-            })}
+            })()}
           </div>
-
-          {/* งบประมาณ */}
-          <div className="panel" style={{minHeight:"unset",padding:18}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <h3>งบประมาณเดือนนี้</h3>
-              <button className="btn btn-ghost" style={{fontSize:11,padding:"3px 8px"}} onClick={()=>{setBudgetInput(String(budget));setEditBudget(true);}}>ตั้งค่า</button>
-            </div>
-            {editBudget&&(
-              <div style={{display:"flex",gap:6,marginBottom:12}}>
-                <input type="number" value={budgetInput} onChange={e=>setBudgetInput(e.target.value)} style={{flex:1,padding:"6px 8px",borderRadius:8,border:"1px solid var(--line)",fontFamily:"inherit",fontSize:13}} placeholder="งบประมาณ (฿)"/>
-                <button className="btn btn-primary" style={{padding:"6px 10px",fontSize:12}} onClick={()=>{const v=+budgetInput;if(v>=0){localStorage.setItem(BUDGET_KEY,v);setBudget(v);}setEditBudget(false);}}>บันทึก</button>
-              </div>
-            )}
-            {budget>0?(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-                <div style={{position:"relative",width:110,height:110}}>
-                  <DonutChart segments={[{value:budgetPct,color:budgetPct>=90?"#E87B6A":"var(--leaf-2)"},{value:100-budgetPct,color:"var(--line)"}]} total={100} size={110}/>
-                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
-                    <span style={{fontSize:18,fontWeight:700,color:"var(--ink)"}}>{budgetPct.toFixed(0)}%</span>
+          <div className="panel" style={{minHeight:"unset"}}>
+            <h3 style={{marginBottom:4}}>ค่าใช้จ่ายแยกตามสถานี</h3>
+            <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:14}}>จัดอันดับตามค่าใช้จ่ายสูงสุด</div>
+            {stBd.length===0
+              ?<div style={{color:"var(--ink-3)",fontSize:13,textAlign:"center",padding:"20px 0"}}>ยังไม่มีข้อมูล</div>
+              :(
+                <>
+                  <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:14}}>
+                    {stBd.map((s,i)=>(
+                      <div key={s.name}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                          <span style={{width:20,height:20,borderRadius:"50%",background:"var(--surface-soft)",border:"1px solid var(--line)",display:"grid",placeItems:"center",fontSize:11,fontWeight:700,color:"var(--ink-2)",flexShrink:0}}>{i+1}</span>
+                          <div style={{width:26,height:26,borderRadius:6,background:s.color,display:"grid",placeItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>{s.abbr}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:600,color:"var(--ink)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.name}</div>
+                          </div>
+                          <div style={{textAlign:"right",flexShrink:0}}>
+                            <div style={{fontSize:13,fontWeight:700,color:"var(--ink)"}}>{THB(s.cost)}</div>
+                            <div style={{fontSize:11,color:"var(--ink-3)"}}>{s.pct.toFixed(0)}%</div>
+                          </div>
+                        </div>
+                        <div style={{height:4,background:"var(--line)",borderRadius:2,marginLeft:58}}>
+                          <div style={{width:s.pct+"%",height:"100%",background:s.color,borderRadius:2}}/>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div style={{textAlign:"center"}}>
-                  <div style={{fontSize:14,fontWeight:700}}>{THB(totC)} / {THB(budget)}</div>
-                  <div style={{fontSize:12,color:budget-totC<0?"#E87B6A":"var(--leaf-2)",marginTop:4}}>
-                    {budget-totC>=0?`เหลืออีก ${THB(budget-totC)}`:`เกินงบ ${THB(totC-budget)}`}
-                  </div>
-                </div>
-              </div>
-            ):<div style={{fontSize:13,color:"var(--ink-3)",textAlign:"center",paddingTop:20}}>กดตั้งค่าเพื่อกำหนดงบประมาณ</div>}
-          </div>
-
-          {/* ส่วนลด */}
-          <div className="panel" style={{minHeight:"unset",padding:18}}>
-            <h3 style={{marginBottom:14}}>ประหยัดได้จากส่วนลด</h3>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,paddingTop:12}}>
-              <div style={{fontSize:36}}>🏷️</div>
-              <div style={{fontSize:26,fontWeight:700,color:"var(--leaf-2)"}}>{THB(totD)}</div>
-              <div style={{fontSize:13,color:"var(--ink-3)"}}>จาก {discSessions} รายการ</div>
-              {totC>0&&<div style={{fontSize:12,color:"var(--ink-3)",marginTop:4}}>คิดเป็น {(totD/(totC+totD)*100).toFixed(1)}% ของค่าใช้จ่ายก่อนลด</div>}
-            </div>
+                  {stBd[0]&&(
+                    <div style={{padding:"10px 12px",background:"var(--surface-soft)",borderRadius:8,border:"1px solid var(--line)",fontSize:12,color:"var(--ink-2)"}}>
+                      คุณใช้จ่ายกับ <strong>{stBd[0].name}</strong> มากที่สุด คิดเป็น {stBd[0].pct.toFixed(0)}% ของค่าใช้จ่ายทั้งหมด
+                    </div>
+                  )}
+                </>
+              )
+            }
           </div>
         </div>
 
-        {/* Recent expenses */}
+        {/* 4 insight cards */}
+        <div className="exp-4cards" style={{marginBottom:14}}>
+          {/* ช่วงเวลาที่ใช้จ่ายสูงสุด */}
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:8,fontWeight:600,letterSpacing:".3px"}}>ช่วงเวลาที่ใช้จ่ายสูงสุด</div>
+            {totC>0?(
+              <>
+                <div style={{fontSize:16,fontWeight:700,color:"var(--ink)",marginBottom:4}}>{insightData.peakTimeLbl}</div>
+                <div style={{fontSize:22,fontWeight:700,color:"var(--leaf-2)",marginBottom:4}}>{THB(insightData.peakTimeAmt)}</div>
+                <div style={{fontSize:12,color:"var(--ink-3)"}}>{insightData.peakTimePct.toFixed(0)}% ของค่าใช้จ่ายทั้งหมด</div>
+              </>
+            ):<div style={{color:"var(--ink-3)",fontSize:13,paddingTop:8}}>ยังไม่มีข้อมูล</div>}
+          </div>
+          {/* วันที่จ่ายแพงสุด */}
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:8,fontWeight:600,letterSpacing:".3px"}}>วันที่จ่ายแพงสุด</div>
+            {insightData.expDay?(
+              <>
+                <div style={{fontSize:15,fontWeight:700,color:"var(--ink)",marginBottom:4}}>{dLbl(insightData.expDay[0])}</div>
+                <div style={{fontSize:22,fontWeight:700,color:"#E87B6A",marginBottom:4}}>{THB(insightData.expDay[1])}</div>
+                <div style={{fontSize:12,color:"var(--ink-3)"}}>{totC?(insightData.expDay[1]/totC*100).toFixed(0):0}% ของค่าใช้จ่ายทั้งหมด</div>
+              </>
+            ):<div style={{color:"var(--ink-3)",fontSize:13,paddingTop:8}}>ยังไม่มีข้อมูล</div>}
+          </div>
+          {/* เซสชั่นที่แพงสุด */}
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:8,fontWeight:600,letterSpacing:".3px"}}>เซสชั่นที่แพงสุด</div>
+            {insightData.expSess?(()=>{
+              const e=insightData.expSess;
+              const s=smeta(e.station,rates);
+              const snap=e.rate_snapshot||{};
+              const isPeak=e.peak_type==="on_peak",isOff=e.peak_type==="off_peak";
+              const timeStr=isPeak?(snap.on_time||"--"):(isOff?(snap.off_time||"--"):"--");
+              return(
+                <>
+                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
+                    <div style={{width:24,height:24,borderRadius:6,background:s.color,display:"grid",placeItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>{s.abbr}</div>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.station}</span>
+                  </div>
+                  <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:2}}>{dLbl(e.date)} · {timeStr}</div>
+                  <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:6}}>{NUM(e.kwh,1)} kWh</div>
+                  <div style={{fontSize:22,fontWeight:700,color:"var(--ink)"}}>{THB(e.final_price)}</div>
+                  <div style={{fontSize:11,color:"var(--ink-3)",marginTop:2}}>{NUM((+e.final_price)/(+e.kwh||1),2)} ฿/kWh</div>
+                </>
+              );
+            })():<div style={{color:"var(--ink-3)",fontSize:13,paddingTop:8}}>ยังไม่มีข้อมูล</div>}
+          </div>
+          {/* สถานีที่คุ้มค่าสุด */}
+          <div className="panel" style={{padding:"16px 18px",minHeight:"unset"}}>
+            <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:8,fontWeight:600,letterSpacing:".3px"}}>สถานีที่คุ้มค่าสุด</div>
+            {insightData.bestSt?(()=>{
+              const b=insightData.bestSt;
+              return(
+                <>
+                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6,flexWrap:"wrap"}}>
+                    <div style={{width:24,height:24,borderRadius:6,background:b.color,display:"grid",placeItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>{b.abbr}</div>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--ink)"}}>{b.name}</span>
+                    <span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#4CAF6E20",color:"#4CAF6E",fontWeight:700}}>ถูกสุด</span>
+                  </div>
+                  <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:4}}>ราคาเฉลี่ย</div>
+                  <div style={{fontSize:22,fontWeight:700,color:"var(--leaf-2)"}}>{NUM(b.avg,2)} ฿/kWh</div>
+                </>
+              );
+            })():<div style={{color:"var(--ink-3)",fontSize:13,paddingTop:8}}>ยังไม่มีข้อมูล</div>}
+          </div>
+        </div>
+
+        {/* Recent charges */}
         <div className="panel" style={{minHeight:"unset",padding:18}}>
-          <h3 style={{marginBottom:14}}>รายการค่าใช้จ่ายล่าสุด</h3>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h3>รายการชาร์จล่าสุด</h3>
+            <span style={{fontSize:12,color:"var(--ink-3)"}}>{mE.length} รายการในเดือนนี้</span>
+          </div>
           {mE.length===0?<div style={{textAlign:"center",color:"var(--ink-3)",padding:"20px 0",fontSize:13}}>ยังไม่มีรายการในเดือนนี้</div>:(
-            <div className="twrap">
-              <table>
-                <thead><tr>
-                  <th>วันที่</th><th>สถานี</th>
-                  <th className="num">พลังงาน (kWh)</th>
-                  <th className="num">ราคา/kWh</th>
-                  <th className="num">ส่วนลด</th>
-                  <th className="num">ยอดรวม</th>
-                  <th>หมายเหตุ</th>
-                </tr></thead>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:"unset"}}>
+                <thead>
+                  <tr style={{borderBottom:"2px solid var(--line)"}}>
+                    {["วันที่","สถานี","เวลา","พลังงาน","ค่าใช้จ่าย","ราคาเฉลี่ย","ประเภท"].map(h=>(
+                      <th key={h} style={{textAlign:"left",padding:"6px 8px 10px",color:"var(--ink-3)",fontWeight:600,fontSize:12,whiteSpace:"nowrap"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
-                  {[...mE].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
-                    const s=smeta(e.station,rates);
-                    return(
-                      <tr key={e.id}>
-                        <td className="date">{dLbl(e.date)}</td>
-                        <td className="station"><div className="station-cell"><div className="badge" style={{background:s.color}}>{s.abbr}</div><div>{e.station}</div></div></td>
-                        <td className="num">{NUM(e.kwh,1)}</td>
-                        <td className="num">{NUM(e.baht_per_kwh,2)}</td>
-                        <td className="num" style={{color:+e.discount>0?"var(--leaf-2)":"var(--muted)"}}>{+e.discount>0?"−"+THB(e.discount):"—"}</td>
-                        <td className="num" style={{fontWeight:600}}>{THB(e.final_price)}</td>
-                        <td style={{fontSize:12,color:"var(--ink-3)"}}>{e.trip||"—"}</td>
-                      </tr>
-                    );
-                  })}
+                  {[...mE].sort((a,b)=>b.date.localeCompare(a.date)).map(e=><EntryRow key={e.id} e={e}/>)}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+
+        {/* Footer note */}
+        <div style={{marginTop:12,fontSize:12,color:"var(--ink-3)",display:"flex",alignItems:"flex-start",gap:6}}>
+          <span>ⓘ</span>
+          <span>ค่าใช้จ่ายทั้งหมดเป็นค่าชาร์จเท่านั้น (ยังไม่รวมค่าบริการอื่นๆ หรือภาษีบริการ)</span>
         </div>
       </>)}
 
       {/* ── แนวโน้ม ── */}
       {subTab==="แนวโน้ม"&&(
         <div className="panel">
-          <div className="panel-hd"><h3>แนวโน้มค่าใช้จ่ายรายเดือน</h3></div>
-          <LineChart data={trendData} color="var(--leaf-2)" h={280}/>
+          <h3 style={{marginBottom:14}}>แนวโน้มค่าใช้จ่ายรายเดือน</h3>
+          {trendData.length===0?<div style={{height:200,display:"grid",placeItems:"center",color:"var(--ink-3)"}}>ยังไม่มีข้อมูล</div>:
+            <ExpBarChart data={trendData} selectedKey={monthKey}/>
+          }
         </div>
       )}
 
@@ -840,45 +1480,89 @@ function ExpensePage({entries,rates}){
       {subTab==="แยกตามสถานี"&&(
         <div className="panel">
           <h3 style={{marginBottom:4}}>แยกตามสถานี</h3>
-          <div className="panel-sub" style={{marginBottom:20}}>{MONTHS_TH[mo-1]} {yr+543} · {mE.length} รายการ</div>
-          <StationBreakdown/>
-          {stBd.items.map(b=>(
-            <div key={b.key} className="bd-row">
-              <div className="dot" style={{background:b.color+"28",color:b.color}}>{b.abbr}</div>
-              <div className="info">
-                <div className="name">{b.key}</div>
-                <div className="meta">{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
-                <div className="bd-bar"><i style={{width:b.pct+"%",background:b.color}}/></div>
+          <div className="panel-sub" style={{marginBottom:20}}>{expYear===0?"ทุกช่วงเวลา":expMonth===0?`ปี ${expYear+543}`:`${MONTHS_TH[mo-1]} ${expYear+543}`} · {mE.length} รายการ</div>
+          {stBd.length===0?<div style={{textAlign:"center",color:"var(--ink-3)",padding:"20px 0"}}>ยังไม่มีข้อมูล</div>:(
+            <>
+              <div style={{display:"flex",gap:20,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
+                <DonutChart segments={stBd.map(b=>({value:b.cost,color:b.color}))} total={totC} centerText={THB(totC)} size={140}/>
+                <div style={{flex:1,minWidth:160,display:"flex",flexDirection:"column",gap:10}}>
+                  {stBd.map(b=>(
+                    <div key={b.name} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:10,height:10,borderRadius:3,background:b.color,flexShrink:0}}/>
+                      <div style={{flex:1,fontSize:13,fontWeight:600,color:"var(--ink-2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
+                      <span style={{fontSize:12,color:"var(--ink-3)",minWidth:36,textAlign:"right"}}>{b.pct.toFixed(0)}%</span>
+                      <span style={{fontSize:13,fontWeight:700,color:"var(--ink)",minWidth:70,textAlign:"right"}}>{THB(b.cost)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div><div className="amt">{THB(b.cost)}</div><div className="pct">{b.pct.toFixed(1)}%</div></div>
-            </div>
-          ))}
+              {stBd.map(b=>(
+                <div key={b.name} className="bd-row">
+                  <div className="dot" style={{background:b.color+"28",color:b.color}}>{b.abbr}</div>
+                  <div className="info">
+                    <div className="name">{b.name}</div>
+                    <div className="meta">{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
+                    <div className="bd-bar"><i style={{width:b.pct+"%",background:b.color}}/></div>
+                  </div>
+                  <div><div className="amt">{THB(b.cost)}</div><div className="pct">{b.pct.toFixed(1)}%</div></div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
-      {/* ── แยกตามหมวด (peak type) ── */}
-      {subTab==="แยกตามหมวด"&&(
+      {/* ── ช่วงเวลา ── */}
+      {subTab==="ช่วงเวลา"&&(
         <div className="panel">
           <h3 style={{marginBottom:4}}>แยกตามประเภทชาร์จ</h3>
-          <div className="panel-sub" style={{marginBottom:20}}>{MONTHS_TH[mo-1]} {yr+543}</div>
-          <div style={{display:"flex",gap:20,alignItems:"center",marginBottom:20}}>
-            <DonutChart segments={pkBd.items} total={pkBd.tot} centerText={THB(pkBd.tot)} size={150}/>
-            <div style={{flex:1,display:"flex",flexDirection:"column",gap:12}}>
-              {pkBd.items.map((b,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:12,height:12,borderRadius:3,background:b.color,flexShrink:0}}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:600}}>{b.lbl}</div>
-                    <div style={{fontSize:11,color:"var(--ink-3)"}}>{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
+          <div className="panel-sub" style={{marginBottom:20}}>{expYear===0?"ทุกช่วงเวลา":expMonth===0?`ปี ${expYear+543}`:`${MONTHS_TH[mo-1]} ${expYear+543}`}</div>
+          {pkBd.items.length===0?<div style={{textAlign:"center",color:"var(--ink-3)",padding:"20px 0"}}>ยังไม่มีข้อมูล</div>:(
+            <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
+              <DonutChart segments={pkBd.items} total={pkBd.tot} centerText={THB(pkBd.tot)} size={150}/>
+              <div style={{flex:1,minWidth:160,display:"flex",flexDirection:"column",gap:12}}>
+                {pkBd.items.map((b,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:12,height:12,borderRadius:3,background:b.color,flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{b.lbl}</div>
+                      <div style={{fontSize:11,color:"var(--ink-3)"}}>{b.n}ครั้ง · {NUM(b.kwh,1)} kWh</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:14,fontWeight:700}}>{THB(b.cost)}</div>
+                      <div style={{fontSize:11,color:"var(--ink-3)"}}>{b.pct.toFixed(1)}%</div>
+                    </div>
                   </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:14,fontWeight:700}}>{THB(b.cost)}</div>
-                    <div style={{fontSize:11,color:"var(--ink-3)"}}>{b.pct.toFixed(1)}%</div>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── รายการชาร์จ ── */}
+      {subTab==="รายการชาร์จ"&&(
+        <div className="panel" style={{minHeight:"unset",padding:18}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h3>รายการชาร์จ — {expYear===0?"ทุกช่วงเวลา":expMonth===0?`ปี ${expYear+543}`:`${MONTHS_TH[mo-1]} ${expYear+543}`}</h3>
+            <span style={{fontSize:12,color:"var(--ink-3)"}}>{mE.length} รายการ</span>
           </div>
+          {mE.length===0?<div style={{textAlign:"center",color:"var(--ink-3)",padding:"20px 0",fontSize:13}}>ยังไม่มีรายการในเดือนนี้</div>:(
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:"unset"}}>
+                <thead>
+                  <tr style={{borderBottom:"2px solid var(--line)"}}>
+                    {["วันที่","สถานี","เวลา","พลังงาน","ค่าใช้จ่าย","ราคาเฉลี่ย","ประเภท"].map(h=>(
+                      <th key={h} style={{textAlign:"left",padding:"6px 8px 10px",color:"var(--ink-3)",fontWeight:600,fontSize:12,whiteSpace:"nowrap"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...mE].sort((a,b)=>b.date.localeCompare(a.date)).map(e=><EntryRow key={e.id} e={e}/>)}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -974,6 +1658,7 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
   const [form,setForm]=useState({
     date:entry?.date||today,
     station:initStation,
+    odometer:entry?.odometer!=null?String(entry.odometer):"",
     trip:entry?.trip||"",
     kwh:entry?String(entry.kwh):"",
     discount:entry?String(entry.discount):"0",
@@ -1023,6 +1708,7 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
     const snap=stationRate?{...stationRate,captured_at:new Date().toISOString()}:null;
     onSave({
       date:form.date, station:form.station, station_id:stationRate?.id||null, trip:form.trip||null,
+      odometer:form.odometer?+form.odometer:null,
       peak_type:form.peak_type||null,
       price_before_disc:+form.price_before_disc,
       kwh:+form.kwh, discount:+form.discount||0,
@@ -1082,7 +1768,12 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
             </div>
           )}
 
-          <div className="field full">
+          <div className="field">
+            <label>เลขไมล์ (km) <span style={{fontWeight:400,color:"var(--muted)"}}>— ไม่บังคับ</span></label>
+            <input type="number" step="0.1" min="0" value={form.odometer} onChange={e=>set("odometer",e.target.value)} placeholder="เช่น 12500"/>
+            <span className="hint">มาตรวัดระยะทาง ณ ตอนเข้าชาร์จ</span>
+          </div>
+          <div className="field">
             <label>ทริป (ไม่บังคับ)</label>
             <input value={form.trip} onChange={e=>set("trip",e.target.value)} placeholder="เช่น เชียงใหม่, หัวหิน…"/>
           </div>
@@ -1133,7 +1824,7 @@ function EntryModal({entry,rates,onClose,onSave,saving}){
 // ── Admin Panel ─────────────────────────────────────────────────
 function AdminPanel({rates,setRates,api}){
   const [local,setLocal]=useState(()=>JSON.parse(JSON.stringify(rates)));
-  const [saving,setSaving]=useState(false);
+  const [savingStation,setSavingStation]=useState(null);
   const [saved,setSaved]=useState(false);
   const [saveErr,setSaveErr]=useState("");
   const [draft,setDraft]=useState({station:"",type:"flat",flat:"7.50",on_peak:"8.00",off_peak:"5.50",on_time:"09:00–22:00",off_time:"22:00–09:00",color:"#6CAE76",abbr:""});
@@ -1148,30 +1839,47 @@ function AdminPanel({rates,setRates,api}){
     setEditKey(station);
     setEditDraft({name:station,abbr:d.abbr||"",color:d.color||"#6CAE76"});
   };
+  const saveStationData=async(station,data)=>{
+    if(!api){ setSaveErr("ไม่ได้เชื่อมต่อ Supabase"); return; }
+    setSavingStation(station);
+    try{
+      await api.upsertRate(station,{
+        rate_type:data.type,
+        on_peak:data.on_peak||null, off_peak:data.off_peak||null,
+        on_time:data.on_time||null, off_time:data.off_time||null,
+        flat:data.flat||null, color:data.color||null, abbr:data.abbr||null,
+      });
+      setRates(r=>{ const n={...r,[station]:data}; saveRates(n); return n; });
+      setSaved(true); setSaveErr(""); setTimeout(()=>setSaved(false),1800);
+    }catch(e){ setSaveErr("บันทึกไม่ได้: "+e.message); }
+    finally{ setSavingStation(null); }
+  };
+
   const applyEdit=()=>{
     const newName=editDraft.name.trim();
     if(!newName) return;
+    let sd,ss;
     setLocal(r=>{
       const next={...r};
       const data={...next[editKey],abbr:editDraft.abbr.toUpperCase().slice(0,3),color:editDraft.color};
       if(newName!==editKey){ delete next[editKey]; next[newName]=data; }
-      else { next[editKey]=data; }
-      return next;
+      else{ next[editKey]=data; }
+      sd=data; ss=newName; return next;
     });
     setEditKey(null);
+    setTimeout(()=>{ if(sd&&ss) saveStationData(ss,sd); },0);
   };
 
   const setField=(station,field,val)=>{
     setLocal(r=>({...r,[station]:{...r[station],[field]:field==="on_peak"||field==="off_peak"||field==="flat"?+val||0:val}}));
   };
 
-  const addStation=()=>{
+  const addStation=async()=>{
     const station=draft.station.trim();
     if(!station){ setSaveErr("กรุณากรอกชื่อสถานี"); return; }
     if(local[station]){ setSaveErr("มีสถานีนี้แล้ว"); return; }
     const next={
-      type:draft.type,
-      color:draft.color||"#6CAE76",
+      type:draft.type, color:draft.color||"#6CAE76",
       abbr:(draft.abbr||makeAbbr(station)).slice(0,3).toUpperCase(),
       ...(draft.type==="peak"
         ? {on_peak:+draft.on_peak||0,off_peak:+draft.off_peak||0,on_time:draft.on_time,off_time:draft.off_time}
@@ -1180,157 +1888,177 @@ function AdminPanel({rates,setRates,api}){
     setLocal(r=>({...r,[station]:next}));
     setDraft(d=>({...d,station:"",abbr:""}));
     setSaveErr("");
+    await saveStationData(station,next);
   };
 
   const deleteStation=async(station)=>{
     if(!confirm(`ลบสถานี ${station}? รายการชาร์จเก่าจะยังอยู่ แต่สถานีนี้จะหายจากตัวเลือกใหม่`)) return;
-    if(!api){
-      setSaveErr("กรุณาเชื่อมต่อ Supabase ก่อนลบสถานี เพื่อให้ข้อมูลออนไลน์");
-      return;
-    }
-    setSaving(true);
+    if(!api){ setSaveErr("ไม่ได้เชื่อมต่อ Supabase"); return; }
+    setSavingStation(station);
     try{
       await api.deleteRate(station);
       setLocal(r=>{ const n={...r}; delete n[station]; return n; });
       setRates(r=>{ const n={...r}; delete n[station]; saveRates(n); return n; });
-      setSaved(true); setSaveErr(""); setTimeout(()=>setSaved(false),2000);
+      setSaved(true); setSaveErr(""); setTimeout(()=>setSaved(false),1800);
     }catch(e){ setSaveErr("ลบไม่ได้: "+e.message); }
-    finally{ setSaving(false); }
+    finally{ setSavingStation(null); }
   };
 
-  const saveAll=async()=>{
-    if(!api){
-      setSaveErr("กรุณาเชื่อมต่อ Supabase ก่อนบันทึกราคา เพื่อให้ข้อมูลออนไลน์");
-      return;
-    }
-    setSaving(true);
-    try{
-      for(const [station,data] of Object.entries(local)){
-        await api.upsertRate(station,{
-          rate_type:data.type,
-          on_peak:data.on_peak||null, off_peak:data.off_peak||null,
-          on_time:data.on_time||null, off_time:data.off_time||null,
-          flat:data.flat||null,
-          color:data.color||null,
-          abbr:data.abbr||null,
-        });
-      }
-      saveRates(local); setRates(local);
-      setSaved(true); setSaveErr(""); setTimeout(()=>setSaved(false),2000);
-    }catch(e){ setSaveErr("บันทึกไม่ได้: "+e.message); }
-    finally{ setSaving(false); }
-  };
+  const stationList = Object.entries(local);
+  const peakCount  = stationList.filter(([,d])=>d.type==="peak").length;
+  const flatCount  = stationList.filter(([,d])=>d.type==="flat").length;
+  const avgPrice   = stationList.length
+    ? stationList.reduce((s,[,d])=>s+(d.type==="peak"?((+d.on_peak||0)+(+d.off_peak||0))/2:(+d.flat||0)),0)/stationList.length
+    : 0;
+
+  const inpStyle = {appearance:"none",fontFamily:"inherit",fontSize:13,color:"var(--ink)",background:"var(--surface-soft)",border:"1px solid var(--line)",borderRadius:8,padding:"8px 12px",outline:"none",width:"100%"};
 
   return(
     <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:12,flexWrap:"wrap"}}>
+      {/* ── Header ── */}
+      <div className="page-hd">
         <div>
-          <h2 style={{margin:"0 0 4px",fontSize:17,fontWeight:600}}>ราคาสถานีชาร์จ</h2>
-          <p style={{margin:0,fontSize:13,color:"var(--ink-3)"}}>แก้ไขราคาที่นี่ — ระบบจะ snapshot ราคา ณ เวลาที่บันทึกรายการชาร์จแต่ละครั้ง</p>
+          <h2>EV Charging Pricing</h2>
+          <p style={{margin:"4px 0 0",fontSize:13,color:"var(--ink-3)"}}>จัดการราคาค่าชาร์จของแต่ละผู้ให้บริการ</p>
         </div>
-        <button className="btn btn-primary" onClick={saveAll} disabled={saving}>
-          {saving?"กำลังบันทึก…":saved?"✓ บันทึกแล้ว":"บันทึกราคา"}
-        </button>
+        {savingStation&&<span style={{fontSize:13,color:"var(--ink-3)",display:"flex",alignItems:"center",gap:6}}><div className="spinner" style={{width:14,height:14,borderWidth:2}}/>กำลังบันทึก…</span>}
+        {saved&&!savingStation&&<span style={{fontSize:13,color:"var(--leaf-2)",fontWeight:600}}>✓ บันทึกแล้ว</span>}
       </div>
-      {isDirty&&<div style={{background:"#FFF3CD",border:"1px solid #E8A33A",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#9A6400"}}>⚠ มีการเปลี่ยนแปลงที่ยังไม่บันทึก</div>}
-      {saveErr&&<div className="err-bar" style={{marginBottom:14}}><span>⚠️ {saveErr}</span><button onClick={()=>setSaveErr("")}>×</button></div>}
-      <div className="add-station-card">
-        <div className="field station-name">
-          <label>เพิ่มสถานี</label>
-          <input value={draft.station} onChange={e=>setDraft(d=>({...d,station:e.target.value,abbr:d.abbr||makeAbbr(e.target.value)}))} placeholder="เช่น Altervim, Tesla Supercharger"/>
-        </div>
-        <div className="field compact">
-          <label>ประเภท</label>
-          <select value={draft.type} onChange={e=>setDraft(d=>({...d,type:e.target.value}))}>
-            <option value="flat">Flat</option>
-            <option value="peak">On/Off Peak</option>
-          </select>
-        </div>
-        <div className="field compact">
-          <label>ตัวย่อ</label>
-          <input value={draft.abbr} onChange={e=>setDraft(d=>({...d,abbr:e.target.value.toUpperCase()}))} placeholder="EV" maxLength="3"/>
-        </div>
-        <div className="field compact">
-          <label>สี</label>
-          <input type="color" value={draft.color} onChange={e=>setDraft(d=>({...d,color:e.target.value}))}/>
-        </div>
-        {draft.type==="flat"?(
-          <div className="field compact">
-            <label>ราคา</label>
-            <input type="number" step="0.01" min="0" value={draft.flat} onChange={e=>setDraft(d=>({...d,flat:e.target.value}))}/>
+
+      {saveErr&&<div className="err-bar" style={{marginBottom:16}}><span>⚠️ {saveErr}</span><button onClick={()=>setSaveErr("")}>×</button></div>}
+
+      {/* ── Summary stats ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+        {[
+          {icon:"🏢",bg:"#E8F5E9",lbl:"ทั้งหมด",val:stationList.length,unit:"สถานี"},
+          {icon:"📈",bg:"#FFF3E0",lbl:"On/Off Peak",val:peakCount,unit:"สถานี"},
+          {icon:"⚡",bg:"#F1F8E9",lbl:"Flat Rate",val:flatCount,unit:"สถานี"},
+          {icon:"฿",bg:"#E3F2FD",lbl:"ราคาเฉลี่ย",val:NUM(avgPrice,2),unit:"บาท/หน่วย"},
+        ].map(c=>(
+          <div key={c.lbl} className="stat" style={{minHeight:"unset",padding:"14px 16px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <div style={{width:36,height:36,borderRadius:10,background:c.bg,display:"grid",placeItems:"center",fontSize:17,flexShrink:0}}>{c.icon}</div>
+              <div className="lbl">{c.lbl}</div>
+            </div>
+            <div className="val" style={{fontSize:26,lineHeight:1}}>{c.val}<small style={{fontSize:12,marginLeft:4}}>{c.unit}</small></div>
           </div>
+        ))}
+      </div>
+
+      {/* ── Add station form ── */}
+      <div style={{background:"var(--surface)",border:"1px solid var(--line)",borderRadius:12,padding:"12px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",boxShadow:"var(--shadow-sm)"}}>
+        <span style={{fontSize:13,fontWeight:700,color:"var(--leaf-2)",whiteSpace:"nowrap"}}>+ เพิ่มสถานีใหม่</span>
+        <input style={{...inpStyle,flex:"2 1 150px"}} value={draft.station}
+          onChange={e=>setDraft(d=>({...d,station:e.target.value,abbr:d.abbr||makeAbbr(e.target.value)}))}
+          placeholder="ชื่อสถานี" onKeyDown={e=>e.key==="Enter"&&addStation()}/>
+        <select style={{...inpStyle,flex:"1 1 120px"}} value={draft.type}
+          onChange={e=>setDraft(d=>({...d,type:e.target.value}))}>
+          <option value="flat">Flat Rate</option>
+          <option value="peak">On/Off Peak</option>
+        </select>
+        {draft.type==="flat"?(
+          <input type="number" step="0.01" min="0"
+            style={{...inpStyle,flex:"1 1 110px",fontFamily:"var(--font-mono)"}}
+            value={draft.flat} onChange={e=>setDraft(d=>({...d,flat:e.target.value}))}
+            placeholder="ราคา (บาท/หน่วย)"/>
         ):(
           <>
-            <div className="field compact">
-              <label>On</label>
-              <input type="number" step="0.01" min="0" value={draft.on_peak} onChange={e=>setDraft(d=>({...d,on_peak:e.target.value}))}/>
-            </div>
-            <div className="field compact">
-              <label>Off</label>
-              <input type="number" step="0.01" min="0" value={draft.off_peak} onChange={e=>setDraft(d=>({...d,off_peak:e.target.value}))}/>
-            </div>
+            <input type="number" step="0.01" min="0"
+              style={{...inpStyle,flex:"1 1 100px",fontFamily:"var(--font-mono)"}}
+              value={draft.on_peak} onChange={e=>setDraft(d=>({...d,on_peak:e.target.value}))}
+              placeholder="On Peak ฿"/>
+            <input type="number" step="0.01" min="0"
+              style={{...inpStyle,flex:"1 1 100px",fontFamily:"var(--font-mono)"}}
+              value={draft.off_peak} onChange={e=>setDraft(d=>({...d,off_peak:e.target.value}))}
+              placeholder="Off Peak ฿"/>
           </>
         )}
-        <button className="btn btn-soft" onClick={addStation}>{I.plus} เพิ่มสถานี</button>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <input type="color" value={draft.color} onChange={e=>setDraft(d=>({...d,color:e.target.value}))}
+            style={{width:36,height:36,padding:3,borderRadius:8,border:"1px solid var(--line)",cursor:"pointer"}}/>
+          <span style={{fontSize:12,color:"var(--ink-3)"}}>สี</span>
+        </div>
+        <button className="btn btn-primary" style={{height:36,padding:"0 16px",flexShrink:0}} onClick={addStation}>{I.plus} เพิ่ม</button>
       </div>
-      <div className="admin-grid">
-        {Object.entries(local).map(([station,data])=>{
+
+      {/* ── Station cards ── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
+        {stationList.map(([station,data])=>{
           const s=smeta(station,rates);
+          const isPeak=data.type==="peak";
           return(
-            <div className="rate-row" key={station}>
-              <div className="rr-name">
-                {editKey===station?(
-                  <div className="rr-edit">
-                    <input className="rr-edit-input" value={editDraft.name} onChange={e=>setEditDraft(d=>({...d,name:e.target.value}))} placeholder="ชื่อสถานี"/>
-                    <input className="rr-edit-input" value={editDraft.abbr} onChange={e=>setEditDraft(d=>({...d,abbr:e.target.value.toUpperCase()}))} placeholder="ตัวย่อ" maxLength="3" style={{width:60}}/>
-                    <input type="color" value={editDraft.color} onChange={e=>setEditDraft(d=>({...d,color:e.target.value}))} style={{width:36,height:34,padding:2,borderRadius:8,border:"1px solid var(--line)",cursor:"pointer"}}/>
-                    <button className="btn btn-primary" style={{padding:"6px 12px",fontSize:12}} onClick={applyEdit}>บันทึก</button>
-                    <button className="btn btn-ghost" style={{padding:"6px 12px",fontSize:12}} onClick={()=>setEditKey(null)}>ยกเลิก</button>
-                  </div>
-                ):(
-                  <div className="rr-sname">
-                    <span style={{width:26,height:26,borderRadius:7,background:data.color||s.color,display:"inline-grid",placeItems:"center",fontSize:10,fontWeight:700,color:"#fff",flexShrink:0}}>{data.abbr||s.abbr}</span>
-                    {station}
-                    <span style={{fontSize:11,background:data.type==="peak"?"#FFF3CD":"var(--mint)",color:data.type==="peak"?"#9A6400":"var(--leaf-deep)",padding:"2px 8px",borderRadius:999,fontWeight:500}}>
-                      {data.type==="peak"?"On/Off Peak":"Flat Rate"}
-                    </span>
+            <div key={station} style={{background:"var(--surface)",border:"1px solid var(--line)",borderRadius:12,overflow:"hidden",boxShadow:"var(--shadow-sm)"}}>
+              {/* Card header */}
+              <div style={{padding:"12px 14px",borderBottom:"1px solid var(--line-2)",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:40,height:40,borderRadius:10,background:data.color||s.color,display:"grid",placeItems:"center",fontWeight:700,fontSize:13,color:"#fff",flexShrink:0,letterSpacing:"0.5px"}}>
+                  {data.abbr||s.abbr}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  {editKey===station?(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                      <input className="rr-edit-input" value={editDraft.name} onChange={e=>setEditDraft(d=>({...d,name:e.target.value}))} placeholder="ชื่อสถานี" style={{flex:1,minWidth:80}}/>
+                      <input className="rr-edit-input" value={editDraft.abbr} onChange={e=>setEditDraft(d=>({...d,abbr:e.target.value.toUpperCase()}))} placeholder="ตัวย่อ" maxLength="3" style={{width:52}}/>
+                      <input type="color" value={editDraft.color} onChange={e=>setEditDraft(d=>({...d,color:e.target.value}))} style={{width:32,height:32,padding:2,borderRadius:7,border:"1px solid var(--line)",cursor:"pointer"}}/>
+                      <button className="btn btn-primary" style={{padding:"4px 10px",fontSize:12,height:32}} onClick={applyEdit}>บันทึก</button>
+                      <button className="btn btn-ghost" style={{padding:"4px 10px",fontSize:12,height:32}} onClick={()=>setEditKey(null)}>ยกเลิก</button>
+                    </div>
+                  ):(
+                    <>
+                      <div style={{fontWeight:700,fontSize:15,color:"var(--ink)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{station}</div>
+                      <span style={{fontSize:11,background:isPeak?"#FFF3CD":"var(--mint)",color:isPeak?"#9A6400":"var(--leaf-deep)",padding:"2px 8px",borderRadius:999,fontWeight:600,display:"inline-block",marginTop:3}}>
+                        {isPeak?"On/Off Peak":"Flat Rate"}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {editKey!==station&&(
+                  <div style={{display:"flex",gap:4,flexShrink:0}}>
+                    <button className="icon-btn" onClick={()=>startEdit(station)}>{I.edit}</button>
+                    <button className="icon-btn danger" onClick={()=>deleteStation(station)}>{I.trash}</button>
                   </div>
                 )}
               </div>
-              {data.type==="peak"?(
-                <div className="rate-inputs">
-                  <div className="rate-input-group">
-                    <label>On Peak (฿/kWh)</label>
-                    <input type="number" step="0.01" min="0" value={data.on_peak||""} onChange={e=>setField(station,"on_peak",e.target.value)}/>
-                  </div>
-                  <div className="rate-input-group">
-                    <label>On Peak เวลา</label>
-                    <input type="text" value={data.on_time||""} onChange={e=>setField(station,"on_time",e.target.value)} placeholder="09:00–22:00" style={{fontFamily:"inherit"}}/>
-                  </div>
-                  <div className="rate-input-group">
-                    <label>Off Peak (฿/kWh)</label>
-                    <input type="number" step="0.01" min="0" value={data.off_peak||""} onChange={e=>setField(station,"off_peak",e.target.value)}/>
-                  </div>
-                  <div className="rate-input-group">
-                    <label>Off Peak เวลา</label>
-                    <input type="text" value={data.off_time||""} onChange={e=>setField(station,"off_time",e.target.value)} placeholder="22:00–09:00" style={{fontFamily:"inherit"}}/>
-                  </div>
+              {/* Card body */}
+              {isPeak?(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr"}}>
+                  {[
+                    {label:"☀ On Peak",field:"on_peak",timeField:"on_time",timePlaceholder:"09:00–22:00",timeColor:"var(--leaf-2)"},
+                    {label:"🌙 Off Peak",field:"off_peak",timeField:"off_time",timePlaceholder:"22:00–09:00",timeColor:"#6AAAE8"},
+                  ].map((p,i)=>(
+                    <div key={p.field} style={{padding:"14px 16px",borderRight:i===0?"1px solid var(--line-2)":"none"}}>
+                      <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:6}}>{p.label}</div>
+                      <div style={{display:"flex",alignItems:"baseline",gap:2}}>
+                        <span style={{fontSize:12,color:"var(--ink-3)",fontWeight:600}}>฿</span>
+                        <input type="number" step="0.01" min="0" value={data[p.field]||""} onChange={e=>setField(station,p.field,e.target.value)} onBlur={()=>saveStationData(station,data)}
+                          style={{border:"none",background:"transparent",fontFamily:"var(--font-mono)",fontSize:26,fontWeight:700,color:"var(--ink)",outline:"none",padding:0,width:"100%"}}/>
+                      </div>
+                      <div style={{fontSize:11,color:"var(--ink-3)",marginBottom:6}}>บาท/หน่วย</div>
+                      <input type="text" value={data[p.timeField]||""} onChange={e=>setField(station,p.timeField,e.target.value)} onBlur={()=>saveStationData(station,data)} placeholder={p.timePlaceholder}
+                        style={{border:"none",background:"transparent",fontFamily:"inherit",fontSize:12,color:p.timeColor,outline:"none",padding:0,fontWeight:600,width:"100%"}}/>
+                    </div>
+                  ))}
                 </div>
               ):(
-                <div className="rate-inputs">
-                  <div className="rate-input-group">
-                    <label>ราคา (฿/kWh)</label>
-                    <input type="number" step="0.01" min="0" value={data.flat||""} onChange={e=>setField(station,"flat",e.target.value)}/>
+                <div style={{padding:"18px 16px",textAlign:"center"}}>
+                  <div style={{display:"flex",alignItems:"baseline",gap:2,justifyContent:"center"}}>
+                    <span style={{fontSize:14,color:"var(--ink-3)",fontWeight:600}}>฿</span>
+                    <input type="number" step="0.01" min="0" value={data.flat||""} onChange={e=>setField(station,"flat",e.target.value)} onBlur={()=>saveStationData(station,data)}
+                      style={{border:"none",background:"transparent",fontFamily:"var(--font-mono)",fontSize:32,fontWeight:700,color:"var(--ink)",outline:"none",padding:0,textAlign:"center",width:"100%"}}/>
+                  </div>
+                  <div style={{fontSize:12,color:"var(--ink-3)",marginBottom:8}}>บาท/หน่วย</div>
+                  <div style={{fontSize:12,color:"var(--leaf-2)",display:"flex",alignItems:"center",gap:4,justifyContent:"center",fontWeight:600}}>
+                    ⚡ คิดราคาเดียวตลอด 24 ชั่วโมง
                   </div>
                 </div>
               )}
-              <div style={{display:"flex",gap:4}}>
-                <button className="icon-btn" onClick={()=>startEdit(station)} title="แก้ไขชื่อ/สี">{I.edit}</button>
-                <button className="icon-btn danger" onClick={()=>deleteStation(station)} title="ลบสถานี">{I.trash}</button>
-              </div>
             </div>
           );
         })}
+      </div>
+
+      {/* Footer */}
+      <div style={{fontSize:12,color:"var(--ink-3)",textAlign:"center",padding:"4px 0 8px"}}>
+        ⓘ ราคาทั้งหมดเป็นบาทต่อหน่วย (kWh)
       </div>
     </div>
   );
@@ -1528,9 +2256,36 @@ function App(){
           <div className="page-hd">
             <div>
               <h2>{PAGE_TITLE[tab]}</h2>
+              {tab==="สถิติ"&&<div style={{fontSize:13,color:"var(--ink-3)",marginTop:2}}>สรุปการใช้งานสถานีชาร์จของคุณ</div>}
               {hasCfg&&status==="err"&&<span className="status-badge st-err"><span className="dot"/>เชื่อมต่อไม่ได้</span>}
             </div>
             <div className="actions">
+              {tab==="สถิติ"&&(
+                <>
+                  <select
+                    value={statYear===0?"all":statYear}
+                    onChange={e=>{const v=e.target.value;setStatYear(v==="all"?0:+v);setStatMonth(0);}}
+                    style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
+                  >
+                    <option value="all">ทุกปี</option>
+                    {statYearOpts.map(({year})=>(
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={statMonth===0?"all":statMonth}
+                    onChange={e=>{const v=e.target.value;setStatMonth(v==="all"?0:+v);}}
+                    style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
+                  >
+                    <option value="all">ทุกเดือน</option>
+                    {(statYear===0?statYearOpts.flatMap(o=>o.months.map(m=>({year:o.year,m}))):
+                      (statYearOpts.find(o=>o.year===statYear)?.months||[]).map(m=>({year:statYear,m}))
+                    ).map(({year,m})=>(
+                      <option key={`${year}-${m}`} value={m}>{MONTHS_FULL[m-1]}</option>
+                    ))}
+                  </select>
+                </>
+              )}
               {tab==="รายการ"&&<button className="btn btn-primary" onClick={()=>setModal("new")}>{I.plus} เพิ่มรายการ</button>}
               {tab==="รายการ"&&<button className="btn btn-ghost" onClick={onExport}>{I.dl} ส่งออก</button>}
             </div>
@@ -1548,43 +2303,20 @@ function App(){
           {/* ภาพรวม */}
           {tab==="สถิติ"&&(
             <>
-              <div className="stat-filter" style={{flexDirection:"row",alignItems:"center",justifyContent:"flex-end",gap:8}}>
-                <select
-                  value={statYear===0?"all":statYear}
-                  onChange={e=>{const v=e.target.value;setStatYear(v==="all"?0:+v);setStatMonth(0);}}
-                  style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
-                >
-                  <option value="all">ทุกปี</option>
-                  {statYearOpts.map(({year})=>(
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-                <select
-                  value={statMonth===0?"all":statMonth}
-                  onChange={e=>{const v=e.target.value;setStatMonth(v==="all"?0:+v);}}
-                  style={{fontSize:13,padding:"7px 12px",borderRadius:9,border:"1px solid var(--line)",background:"var(--surface)",fontFamily:"inherit",color:"var(--ink)",cursor:"pointer",outline:"none",boxShadow:"var(--shadow-sm)"}}
-                >
-                  <option value="all">ทุกเดือน</option>
-                  {(statYear===0?statYearOpts.flatMap(o=>o.months.map(m=>({year:o.year,m}))):
-                    (statYearOpts.find(o=>o.year===statYear)?.months||[]).map(m=>({year:statYear,m}))
-                  ).map(({year,m})=>(
-                    <option key={`${year}-${m}`} value={m}>{MONTHS_FULL[m-1]}</option>
-                  ))}
-                </select>
+              <DashStatCards entries={statsEntries} allEntries={yearEntries} rates={rates}/>
+              <div className="dash-2col">
+                <TrendChart entries={entries}/>
+                <InsightsPanel entries={statsEntries} allEntries={entries} rates={rates}/>
               </div>
-              <StatCards entries={statsEntries} allEntries={yearEntries}/>
-              <div className="panels">
-                <ChartPanel
-                  entries={yearEntries}
-                  monthFilter={statYear!==0&&statMonth!==0?`${statYear}-${String(statMonth).padStart(2,"0")}`:null}
-                  setMonthFilter={(val)=>{
-                    if(!val) return;
-                    const [y,m]=val.split("-");
-                    setStatYear(+y); setStatMonth(+m);
-                  }}/>
-                <BreakdownPanel entries={statsEntries} rates={rates}/>
+              <div className="dash-3col">
+                <StationDistTable entries={statsEntries} rates={rates} onViewAll={()=>setTab("รายการ")}/>
+                <PeakTimePanel entries={statsEntries}/>
+                <CostComparePanel entries={statsEntries} rates={rates}/>
               </div>
-              <DashboardBottom entries={statsEntries} rates={rates}/>
+              <div className="dash-2col">
+                <RecentChargesPanel entries={entries} rates={rates} onViewAll={()=>setTab("รายการ")}/>
+                <VehicleEffPanel entries={statsEntries} allEntries={entries}/>
+              </div>
             </>
           )}
 
